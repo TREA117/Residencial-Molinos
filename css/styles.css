@@ -70,8 +70,9 @@ body {
   margin-bottom: 1.5rem;
 }
 .auth-logo-wrap img {
-  height: 180px;
-  width: auto;
+  width: 100%;
+  height: auto;
+  max-height: 260px;
   object-fit: contain;
 }
 .auth-logo {
