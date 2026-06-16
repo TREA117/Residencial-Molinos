@@ -95,16 +95,25 @@ async function approveResident(id) {
   const r = DB.residents.find(r=>r.id===id);
   if (!r) return;
   r.status = 'approved';
-  // Also update user record
   const u = DB.users.find(u=>u.id===r.userId||u.id===r.user_id||u.email===r.email);
   if (u) { u.deptoStatus='approved'; u.depto_status='approved'; }
   try {
-    const client = window.SUPABASE?.client?.();
-    if (client) {
-      await client.from('residents').update({status:'approved'}).eq('id',id);
-      if (u?.id) await client.from('users').update({depto_status:'approved'}).eq('id',u.id);
+    const sb = window.SUPABASE;
+    const client = sb?.client?.();
+    if (sb) {
+      if (r._fromUsers) {
+        // Usuario registrado solo en users, crear fila en residents
+        await sb.insert('residents', {
+          name: r.name, email: r.email, phone: r.phone,
+          depto: r.depto, status: 'approved', fee: r.fee || 1500,
+          user_id: r.userId || r.user_id || null
+        });
+      } else if (client) {
+        await client.from('residents').update({status:'approved'}).eq('id', id);
+      }
+      if (client && u?.id) await client.from('users').update({depto_status:'approved'}).eq('id', u.id);
     }
-  } catch(e) { console.warn('Supabase approve resident failed',e); }
+  } catch(e) { console.warn('Supabase approve resident failed', e); }
   renderResidents();
   showToast('✓ Residente '+r.name+' autorizado — Depto '+r.depto);
 }
@@ -114,8 +123,16 @@ async function rejectResident(id) {
   if (r) {
     r.status = 'rejected';
     try {
-      const client = window.SUPABASE?.client?.();
-      if (client) await client.from('residents').update({status:'rejected'}).eq('id',id);
+      const sb = window.SUPABASE;
+      const client = sb?.client?.();
+      if (r._fromUsers) {
+        // Solo actualizar users; no hay fila en residents
+        if (client && r.user_id) await client.from('users').update({depto_status:'rejected'}).eq('id', r.user_id);
+      } else if (client) {
+        await client.from('residents').update({status:'rejected'}).eq('id', id);
+        const u = DB.users.find(u=>u.id===r.userId||u.id===r.user_id||u.email===r.email);
+        if (u?.id) await client.from('users').update({depto_status:'rejected'}).eq('id', u.id);
+      }
     } catch(e) { console.warn('Supabase reject resident failed',e); }
   }
   renderResidents(); showToast('Residente rechazado','error');

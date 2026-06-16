@@ -13,7 +13,7 @@ function fillLogin(email, pass) {
 }
 
 /* ── NAVIGATION ────────────────────────────────────────────── */
-function goTo(page) {
+async function goTo(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const pageEl = document.getElementById('page' + page.charAt(0).toUpperCase() + page.slice(1));
@@ -21,6 +21,41 @@ function goTo(page) {
   document.querySelectorAll('.nav-item').forEach(n => {
     if (n.getAttribute('onclick')?.includes("'" + page + "'")) n.classList.add('active');
   });
+
+  // Recargar residentes y usuarios frescos de Supabase al abrir esa sección
+  if (page === 'residents') {
+    const sb = window.SUPABASE;
+    if (sb && sb.config && sb.config().hasKey) {
+      try {
+        const [residents, users] = await Promise.all([
+          sb.list('residents'),
+          sb.list('users'),
+        ]);
+        if (residents) DB.residents = residents.map(r => ({ ...r, userId: r.userId || r.user_id || null }));
+        if (users)     DB.users     = users.map(u => ({ ...u, deptoStatus: u.deptoStatus || u.depto_status || 'pending', pass: u.pass || u.password_hash || '' }));
+
+        // Incluir usuarios pendientes que no tengan fila en residents todavía
+        if (DB.users && DB.residents) {
+          const residentEmails = new Set(DB.residents.map(r => (r.email || '').toLowerCase()));
+          const orphanPending = DB.users.filter(u =>
+            u.role !== 'admin' &&
+            (u.depto_status === 'pending' || u.deptoStatus === 'pending') &&
+            !residentEmails.has((u.email || '').toLowerCase())
+          );
+          orphanPending.forEach(u => {
+            DB.residents.push({
+              id: 'usr_' + u.id,
+              name: u.name, email: u.email, phone: u.phone || '',
+              depto: u.depto || '', status: 'pending', fee: u.fee || 1500,
+              user_id: u.id, userId: u.id,
+              _fromUsers: true
+            });
+          });
+        }
+      } catch(e) { console.warn('reload residents failed', e); }
+    }
+  }
+
   const renders = {
     dashboard:  renderDashboard,
     residents:  renderResidents,
