@@ -40,19 +40,9 @@
         <p style="font-size:12px;color:var(--mist);text-align:center;margin-top:10px;cursor:pointer" onclick="showOTP()">¿Prefiero código OTP por correo →</p>
 
         <!-- Credenciales de acceso rápido -->
-        <div style="margin-top:14px;border:1px solid var(--c-border);border-radius:var(--r-md);overflow:hidden;font-size:12px">
-          <div style="background:var(--navy);color:white;padding:6px 12px;font-weight:600;font-size:11px;letter-spacing:0.05em;text-transform:uppercase">Accesos de prueba</div>
-          <div style="padding:10px 12px;display:flex;flex-direction:column;gap:6px">
-            <div onclick="fillLogin('admin@realmolinos3.com','admin123')" style="cursor:pointer;padding:8px 10px;background:var(--c-bg);border-radius:var(--r-sm);border:1px solid var(--c-border);transition:background 0.15s" onmouseover="this.style.background='#e8f0fe'" onmouseout="this.style.background='var(--c-bg)'">
-              <div style="font-weight:600;color:var(--navy)">👑 Administrador</div>
-              <div style="color:var(--mist);margin-top:2px">admin@realmolinos3.com · admin123</div>
-            </div>
-            <div onclick="fillLogin('residente@realmolinos3.com','res123')" style="cursor:pointer;padding:8px 10px;background:var(--c-bg);border-radius:var(--r-sm);border:1px solid var(--c-border);transition:background 0.15s" onmouseover="this.style.background='#e8f0fe'" onmouseout="this.style.background='var(--c-bg)'">
-              <div style="font-weight:600;color:var(--navy)">🏠 Residente</div>
-              <div style="color:var(--mist);margin-top:2px">residente@realmolinos3.com · res123</div>
-            </div>
-          </div>
-          <div style="padding:5px 12px;background:var(--c-bg);border-top:1px solid var(--c-border);color:var(--mist);font-size:10px">Toca una tarjeta para llenar el formulario automáticamente</div>
+        <div style="margin-top:14px;font-size:12px;color:var(--mist);text-align:center;line-height:2">
+          <span onclick="fillLogin('admin@molino.com','admin123')" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px">admin@molino.com / admin123</span><br>
+          <span onclick="fillLogin('persona@gmail.com','persona123')" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px">persona@gmail.com / persona123</span>
         </div>
       </div>
 
