@@ -76,31 +76,39 @@ async function doRegister() {
   if (!name || !email || !phone || !depto || !pass) {
     showAlert('alertAuth', 'Completa todos los campos', 'error'); return;
   }
-  // Validate depto format
-  if (/\s/.test(depto) || depto !== depto.toUpperCase()) {
-    showAlert('alertAuth', 'El número de departamento debe estar en mayúsculas y sin espacios (ej: 10H)', 'error'); return;
-  }
+
+  const sb = window.SUPABASE;
+  if (!sb) { showAlert('alertAuth', 'Error de conexión con el servidor', 'error'); return; }
 
   const btn = document.querySelector('#formRegister .btn-primary');
   if (btn) { btn.disabled = true; btn.textContent = 'Registrando...'; }
 
   try {
-    // DB.users.push usa el Proxy que llama SUPABASE.insert internamente
-    await DB.users.push({
+    // Insertar usuario en Supabase directamente
+    const userData = await sb.insert('users', {
       name, email, password_hash: pass, phone, role: 'resident',
       depto, depto_status: 'pending', fee: 1500
     });
 
     // Obtener el id real generado por Supabase
-    const createdUser = DB.users[DB.users.length - 1];
-    const userId = createdUser?.id ?? null;
+    const userId = Array.isArray(userData) && userData[0] ? userData[0].id : null;
 
-    await DB.residents.push({
+    // Agregar al array local
+    if (Array.isArray(userData) && userData[0]) {
+      DB.users.push({ ...userData[0], deptoStatus: 'pending', pass });
+    }
+
+    // Insertar residente en Supabase
+    const residentData = await sb.insert('residents', {
       name, email, phone, depto, status: 'pending', fee: 1500,
       user_id: userId
     });
 
-    console.info('📬 Nuevo registro pendiente de autorización:', name, depto);
+    if (Array.isArray(residentData) && residentData[0]) {
+      DB.residents.push(residentData[0]);
+    }
+
+    console.info('📬 Nuevo registro pendiente de autorización:', name, depto, '| user_id:', userId);
     showAlert('alertAuth', '✓ Registro enviado. El administrador autorizará tu acceso.', 'success');
     switchAuth('login');
   } catch(err) {
