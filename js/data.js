@@ -12,10 +12,6 @@ function normalizeUser(u) {
     depto_status: u.depto_status || u.deptoStatus   || 'pending',
   };
 }
-function normalizeResident(r) {
-  if (!r) return r;
-  return { ...r, userId: r.userId || r.user_id || null };
-}
 function normalizePayment(p) {
   if (!p) return p;
   return { ...p,
@@ -112,18 +108,6 @@ function toDbFinance(obj) {
     notes:       obj.notes || '',
     cat:         obj.cat  || obj.category    || '',
     ref:         obj.ref  || obj.reference   || '',
-  };
-}
-
-function toDbResident(obj) {
-  return {
-    name:    obj.name,
-    email:   obj.email   || '',
-    phone:   obj.phone   || '',
-    depto:   obj.depto   || '',
-    status:  obj.status  || 'pending',
-    fee:     obj.fee     || 1500,
-    user_id: obj.userId  || obj.user_id || null,
   };
 }
 

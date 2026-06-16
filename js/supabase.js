@@ -5,7 +5,7 @@
 
    Uso básico:
      window.SUPABASE.init();
-     const residents = await window.SUPABASE.list('residents');
+     const users = await window.SUPABASE.list('users');
 */
 
 (function () {
