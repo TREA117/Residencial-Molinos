@@ -92,7 +92,6 @@ function toDbPayment(obj, currentUser, depto) {
     sent_date:     new Date().toISOString().split('T')[0],
     ref:           obj.ref || null,
     voucher_url:   obj.voucherUrl || null,
-    has_voucher:   !!obj.voucherUrl,
     payment_date:  obj.paymentDate || null,
   };
 }
