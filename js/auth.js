@@ -81,35 +81,37 @@ async function doRegister() {
     showAlert('alertAuth', 'El número de departamento debe estar en mayúsculas y sin espacios (ej: 10H)', 'error'); return;
   }
 
-  const newUser = {
-    name, email, password_hash: pass, pass,
-    phone, role: 'resident',
-    depto, depto_status: 'pending', deptoStatus: 'pending', fee: 1500
-  };
+  const btn = document.querySelector('#formRegister .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Registrando...'; }
 
   try {
-    const sb = window.SUPABASE;
-    if (sb && sb.config().hasKey) {
-      const { data, error } = await sb.insert('users', {
-        name, email, password_hash: pass, phone, role: 'resident',
-        depto, depto_status: 'pending', fee: 1500
-      });
-      if (error) throw error;
-      // Also create resident record as pending
-      await sb.insert('residents', {
-        name, email, phone, depto, status: 'pending', fee: 1500,
-        user_id: Array.isArray(data) ? data[0]?.id : data?.id || null
-      });
-      // Notify admin (in production: trigger email/push notification)
-      console.info('📬 Nuevo registro pendiente de autorización:', name, depto);
-    }
-  } catch(err) {
-    console.warn('Could not save to Supabase', err);
-  }
+    // DB.users.push usa el Proxy que llama SUPABASE.insert internamente
+    await DB.users.push({
+      name, email, password_hash: pass, phone, role: 'resident',
+      depto, depto_status: 'pending', fee: 1500
+    });
 
-  DB.users.push(newUser);
-  showAlert('alertAuth', '✓ Registro enviado. El administrador recibirá una notificación para autorizar tu acceso.', 'success');
-  switchAuth('login');
+    // Obtener el id real generado por Supabase
+    const createdUser = DB.users[DB.users.length - 1];
+    const userId = createdUser?.id ?? null;
+
+    await DB.residents.push({
+      name, email, phone, depto, status: 'pending', fee: 1500,
+      user_id: userId
+    });
+
+    console.info('📬 Nuevo registro pendiente de autorización:', name, depto);
+    showAlert('alertAuth', '✓ Registro enviado. El administrador autorizará tu acceso.', 'success');
+    switchAuth('login');
+  } catch(err) {
+    console.error('Registration error', err);
+    const msg = (err?.message || '').toLowerCase().includes('duplicate') || (err?.message || '').includes('unique')
+      ? 'Ese correo ya está registrado.'
+      : (err?.message || 'Error al registrar, intenta de nuevo.');
+    showAlert('alertAuth', msg, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Solicitar acceso'; }
+  }
 }
 
 function loginUser(user) {
