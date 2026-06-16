@@ -194,7 +194,6 @@ function openModalUploadPayment() {
   const status = res?.status || currentUser?.deptoStatus || currentUser?.depto_status || (currentUser?.depto ? 'approved' : 'pending');
   if (status !== 'approved') { showToast('Tu departamento aún no ha sido verificado', 'error'); return; }
   document.getElementById('payAmount').value    = '';
-  document.getElementById('payRef').value       = '';
   document.getElementById('payDate').value      = new Date().toISOString().split('T')[0];
   document.getElementById('uploadFileName').textContent = 'Sin archivo seleccionado';
   openModal('modalUploadPayment');
@@ -208,7 +207,6 @@ function fileSelected(input) {
 async function savePayment() {
   const month       = document.getElementById('payMonth').value;
   const amount      = parseFloat(document.getElementById('payAmount').value);
-  const ref         = document.getElementById('payRef').value.trim();
   const paymentDate = document.getElementById('payDate').value;
   const file        = document.getElementById('payFile')?.files?.[0] || null;
 
@@ -243,7 +241,7 @@ async function savePayment() {
   }
 
   // Guardar registro de pago
-  const payRecord = toDbPayment({ month, amount, ref, voucherUrl, paymentDate }, currentUser, res.depto);
+  const payRecord = toDbPayment({ month, amount, voucherUrl, paymentDate }, currentUser, res.depto);
   try {
     const rows = await window.SUPABASE.insert('payments', payRecord);
     const row = Array.isArray(rows) ? rows[0] : rows;

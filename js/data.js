@@ -90,7 +90,6 @@ function toDbPayment(obj, currentUser, depto) {
     amount:        obj.amount,
     status:        'pending',
     sent_date:     new Date().toISOString().split('T')[0],
-    ref:           obj.ref || null,
     voucher_url:   obj.voucherUrl || null,
     payment_date:  obj.paymentDate || null,
   };
