@@ -92,42 +92,52 @@ function renderResidents() {
 }
 
 async function approveResident(id) {
-  const r = DB.residents.find(r=>r.id===id);
+  const uid = Number(id);
+  const r = DB.residents.find(r=>Number(r.id)===uid);
   if (!r) return;
-  r.status = 'approved';
-  const u = DB.users.find(u=>u.id===id);
-  if (u) { u.depto_status='approved'; u.deptoStatus='approved'; }
   try {
-    const client = window.SUPABASE?.client?.();
-    if (client) await client.from('users').update({depto_status:'approved'}).eq('id', id);
-  } catch(e) { console.warn('Supabase approve failed', e); }
-  renderResidents();
-  showToast('✓ Residente '+r.name+' autorizado — Depto '+r.depto);
+    await window.SUPABASE.update('users', uid, { depto_status: 'approved' });
+    r.status = 'approved';
+    const u = DB.users.find(u=>Number(u.id)===uid);
+    if (u) { u.depto_status='approved'; u.deptoStatus='approved'; }
+    renderResidents();
+    showToast('✓ Residente '+r.name+' autorizado — Depto '+r.depto);
+  } catch(e) {
+    console.error('Supabase approve failed', e);
+    showToast('Error al guardar en Supabase: '+(e?.message||e),'error');
+  }
 }
 
 async function rejectResident(id) {
-  const r = DB.residents.find(r=>r.id===id);
-  if (r) {
+  const uid = Number(id);
+  const r = DB.residents.find(r=>Number(r.id)===uid);
+  if (!r) return;
+  try {
+    await window.SUPABASE.update('users', uid, { depto_status: 'rejected' });
     r.status = 'rejected';
-    const u = DB.users.find(u=>u.id===id);
+    const u = DB.users.find(u=>Number(u.id)===uid);
     if (u) { u.depto_status='rejected'; u.deptoStatus='rejected'; }
-    try {
-      const client = window.SUPABASE?.client?.();
-      if (client) await client.from('users').update({depto_status:'rejected'}).eq('id', id);
-    } catch(e) { console.warn('Supabase reject failed',e); }
+    renderResidents();
+    showToast('Residente rechazado', 'error');
+  } catch(e) {
+    console.error('Supabase reject failed', e);
+    showToast('Error al guardar en Supabase: '+(e?.message||e),'error');
   }
-  renderResidents(); showToast('Residente rechazado','error');
 }
 
 async function deleteResident(id) {
   if (!confirm('¿Eliminar este usuario?')) return;
-  DB.users     = DB.users.filter(u=>u.id!==id);
-  DB.residents = DB.residents.filter(r=>r.id!==id);
+  const uid = Number(id);
   try {
-    const client = window.SUPABASE?.client?.();
-    if (client) await client.from('users').delete().eq('id', id);
-  } catch(e) { console.warn('Supabase delete user failed',e); }
-  renderResidents(); showToast('Usuario eliminado');
+    await window.SUPABASE.remove('users', uid);
+    DB.users     = DB.users.filter(u=>Number(u.id)!==uid);
+    DB.residents = DB.residents.filter(r=>Number(r.id)!==uid);
+    renderResidents();
+    showToast('Usuario eliminado');
+  } catch(e) {
+    console.error('Supabase delete failed', e);
+    showToast('Error al eliminar en Supabase: '+(e?.message||e),'error');
+  }
 }
 
 function editResidentModal(id) {
@@ -144,23 +154,25 @@ function editResidentModal(id) {
 }
 
 async function saveEditResident() {
-  const id     = Number(document.getElementById('editResId').value);
-  const r      = DB.residents.find(r=>r.id===id);
+  const id  = Number(document.getElementById('editResId').value);
+  const r   = DB.residents.find(r=>Number(r.id)===id);
   if (!r) return;
-  r.name   = document.getElementById('editResName').value.trim();
-  r.email  = document.getElementById('editResEmail').value.trim();
-  r.phone  = document.getElementById('editResPhone').value.trim();
-  r.depto  = document.getElementById('editResDepto').value.trim().toUpperCase().replace(/\s+/g,'');
-  r.fee    = parseFloat(document.getElementById('editResFee').value)||1500;
-  r.status = document.getElementById('editResStatus').value;
-  // Sync back to DB.users
-  const u = DB.users.find(u=>u.id===id);
-  if (u) { u.name=r.name; u.email=r.email; u.phone=r.phone; u.depto=r.depto; u.fee=r.fee; u.depto_status=r.status; u.deptoStatus=r.status; }
+  const name   = document.getElementById('editResName').value.trim();
+  const email  = document.getElementById('editResEmail').value.trim();
+  const phone  = document.getElementById('editResPhone').value.trim();
+  const depto  = document.getElementById('editResDepto').value.trim().toUpperCase().replace(/\s+/g,'');
+  const fee    = parseFloat(document.getElementById('editResFee').value)||1500;
+  const status = document.getElementById('editResStatus').value;
   try {
-    const client = window.SUPABASE?.client?.();
-    if (client) await client.from('users').update({name:r.name,email:r.email,phone:r.phone,depto:r.depto,fee:r.fee,depto_status:r.status}).eq('id',id);
-  } catch(e) { console.warn('Supabase update user failed',e); }
-  closeModal('modalEditResident'); renderResidents(); showToast('Residente actualizado ✓');
+    await window.SUPABASE.update('users', id, { name, email, phone, depto, fee, depto_status: status });
+    r.name=name; r.email=email; r.phone=phone; r.depto=depto; r.fee=fee; r.status=status;
+    const u = DB.users.find(u=>Number(u.id)===id);
+    if (u) { u.name=name; u.email=email; u.phone=phone; u.depto=depto; u.fee=fee; u.depto_status=status; u.deptoStatus=status; }
+    closeModal('modalEditResident'); renderResidents(); showToast('Residente actualizado ✓');
+  } catch(e) {
+    console.error('Supabase update user failed', e);
+    showToast('Error al guardar: '+(e?.message||e),'error');
+  }
 }
 
 function openModalAddResident() {
