@@ -241,48 +241,53 @@ async function approvePayment(id) {
   const today = new Date();
   const mm    = String(today.getMonth()+1).padStart(2,'0');
   const yyyy  = today.getFullYear();
-  p.status       = 'approved';
-  p.approvedDate = today.toISOString().split('T')[0];
-  p.approved_date= p.approvedDate;
-  p.receiptNum   = `${yyyy}-${mm}-${p.depto||'XXX'}`;
-  p.receipt_num  = p.receiptNum;
+  const approvedDate = today.toISOString().split('T')[0];
+  const receiptNum   = `${yyyy}-${mm}-${p.depto||'XXX'}`;
+  const desc = 'Cuota mantenimiento '+p.month+' — Depto '+p.depto;
 
   try {
-    const client = window.SUPABASE?.client?.();
-    if (client) {
-      await client.from('payments').update({
-        status:'approved', approved_date:p.approvedDate, receipt_num:p.receiptNum
-      }).eq('id',id);
-      await client.from('finances').insert({
-        date:p.approvedDate, description:'Cuota mantenimiento '+p.month+' — Depto '+p.depto,
-        category:'Mantenimiento', type:'income', amount:p.amount,
-        reference:p.receiptNum, notes:'', cat:'Mantenimiento', ref:p.receiptNum
-      });
-    }
-  } catch(e) { console.warn('Supabase approve payment failed',e); }
+    await window.SUPABASE.update('payments', id, {
+      status:'approved', approved_date:approvedDate, receipt_num:receiptNum
+    });
+    const finRows = await window.SUPABASE.insert('finances', {
+      date:approvedDate, description:desc,
+      category:'Mantenimiento', type:'income', amount:p.amount,
+      reference:receiptNum, notes:'', cat:'Mantenimiento', ref:receiptNum
+    });
+    p.status = 'approved';
+    p.approvedDate = approvedDate; p.approved_date = approvedDate;
+    p.receiptNum = receiptNum; p.receipt_num = receiptNum;
 
-  Array.prototype.push.call(DB.finances,{
-    id:DB.nextId++, date:p.approvedDate,
-    desc:'Cuota mantenimiento '+p.month+' — Depto '+p.depto,
-    description:'Cuota mantenimiento '+p.month+' — Depto '+p.depto,
-    cat:'Mantenimiento', category:'Mantenimiento',
-    type:'income', amount:p.amount, ref:p.receiptNum, reference:p.receiptNum, notes:''
-  });
+    const finRow = Array.isArray(finRows) ? finRows[0] : finRows;
+    if (finRow) {
+      finRow.desc = finRow.description;
+      finRow.cat  = finRow.category;
+      finRow.ref  = finRow.reference;
+      DB.finances.push(finRow);
+    }
+  } catch(e) {
+    console.error('Supabase approve payment failed', e);
+    showToast('Error al aprobar el pago: '+(e?.message||e), 'error');
+    return;
+  }
 
   renderPayments();
   showReceipt(id);
   updatePendingCounts();
-  showToast('✓ Pago aprobado — Recibo '+p.receiptNum+' generado');
+  showToast('✓ Pago aprobado — Recibo '+receiptNum+' generado');
 }
 
 async function rejectPayment(id) {
   const p = DB.payments.find(p=>p.id===id);
   if (p) {
-    p.status='rejected';
     try {
-      const client=window.SUPABASE?.client?.();
-      if(client) await client.from('payments').update({status:'rejected'}).eq('id',id);
-    } catch(e){ console.warn(e); }
+      await window.SUPABASE.update('payments', id, { status: 'rejected' });
+      p.status='rejected';
+    } catch(e) {
+      console.error('Supabase reject payment failed', e);
+      showToast('Error al rechazar el pago: '+(e?.message||e), 'error');
+      return;
+    }
   }
   renderPayments(); showToast('Comprobante rechazado','error'); updatePendingCounts();
 }

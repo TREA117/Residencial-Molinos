@@ -219,58 +219,49 @@ async function savePayment() {
     r.userId===currentUser.id||r.user_id===currentUser.id||r.email===currentUser.email
   ) || { depto: currentUser.depto || '—' };
 
+  const client = window.SUPABASE?.client?.();
+  if (!client) { showToast('Sin conexión con Supabase', 'error'); return; }
+
   let voucherUrl = null;
 
-  // Upload to Supabase Storage
+  // Subir imagen a Supabase Storage
   try {
     showToast('Subiendo comprobante...', 'success');
-    const client = window.SUPABASE?.client?.();
-    if (client) {
-      const today = new Date();
-      const mm    = String(today.getMonth()+1).padStart(2,'0');
-      const yyyy  = today.getFullYear();
-      const fileName = `${yyyy}-${mm}-${res.depto}-C_${Date.now()}.${file.name.split('.').pop()}`;
-      const { error: uploadError } = await client.storage
-        .from('comprobantes').upload(fileName, file, { cacheControl:'3600', upsert:false });
-      if (uploadError) {
-        console.warn('Storage error:', uploadError);
-        showToast('Error al subir imagen: ' + uploadError.message, 'error');
-      } else {
-        const { data: { publicUrl } } = client.storage.from('comprobantes').getPublicUrl(fileName);
-        voucherUrl = publicUrl;
-      }
-    }
-  } catch(err) { console.warn('Upload failed', err); }
+    const today = new Date();
+    const mm    = String(today.getMonth()+1).padStart(2,'0');
+    const yyyy  = today.getFullYear();
+    const fileName = `${yyyy}-${mm}-${res.depto}-C_${Date.now()}.${file.name.split('.').pop()}`;
+    const { error: uploadError } = await client.storage
+      .from('comprobantes').upload(fileName, file, { cacheControl:'3600', upsert:false });
+    if (uploadError) throw uploadError;
+    const { data: { publicUrl } } = client.storage.from('comprobantes').getPublicUrl(fileName);
+    voucherUrl = publicUrl;
+  } catch(err) {
+    console.error('Storage upload failed', err);
+    showToast('Error al subir imagen: ' + (err?.message || err), 'error');
+    return;
+  }
 
-  // Save payment record
+  // Guardar registro de pago
   const payRecord = toDbPayment({ month, amount, ref, voucherUrl, paymentDate }, currentUser, res.depto);
   try {
-    const client = window.SUPABASE?.client?.();
-    if (client) {
-      const { data, error } = await client.from('payments').insert(payRecord).select();
-      if (error) throw error;
-      const row = Array.isArray(data) ? data[0] : data;
-      if (row) {
-        row.residentId   = row.resident_id;
-        row.residentName = row.resident_name;
-        row.sentDate     = row.sent_date;
-        row.voucherUrl   = row.voucher_url;
-        Array.prototype.push.call(DB.payments, row);
-      }
-    }
+    const rows = await window.SUPABASE.insert('payments', payRecord);
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('Supabase no devolvió el registro insertado');
+    row.residentId   = row.resident_id;
+    row.residentName = row.resident_name;
+    row.sentDate      = row.sent_date;
+    row.voucherUrl    = row.voucher_url;
+    DB.payments.push(row);
   } catch(err) {
-    console.warn('Supabase insert failed, saving locally', err);
-    Array.prototype.push.call(DB.payments, {
-      id: DB.nextId++, residentId: currentUser.id, residentName: currentUser.name,
-      depto: res.depto, month, amount, status: 'pending',
-      sentDate: new Date().toISOString().split('T')[0],
-      paymentDate, ref, voucherUrl, approvedDate: null, receiptNum: null
-    });
+    console.error('Supabase insert payment failed', err);
+    showToast('Error al guardar el pago: ' + (err?.message || err), 'error');
+    return;
   }
 
   closeModal('modalUploadPayment');
   renderMyPayments();
-  showToast(voucherUrl ? '✓ Comprobante enviado con imagen' : '✓ Comprobante enviado (sin imagen)');
+  showToast('✓ Comprobante enviado con imagen');
 }
 
 /* ── CONTACTS (resident view) ──────────────────────────────── */
