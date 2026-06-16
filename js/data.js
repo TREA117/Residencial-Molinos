@@ -36,6 +36,18 @@ function normalizeFinance(f) {
   };
 }
 
+/* Construye DB.residents como vista de DB.users (solo no-admin) */
+function syncResidentsFromUsers() {
+  DB.residents = DB.users
+    .filter(u => u.role !== 'admin')
+    .map(u => ({
+      ...u,
+      status:  u.depto_status || u.deptoStatus || 'pending',
+      userId:  u.id,
+      user_id: u.id,
+    }));
+}
+
 async function loadDB() {
   const sb = window.SUPABASE;
   if (!(sb && sb.config && sb.config().hasKey)) {
@@ -43,20 +55,18 @@ async function loadDB() {
     return;
   }
   try {
-    const [users, residents, payments, finances] = await Promise.all([
+    const [users, payments, finances] = await Promise.all([
       sb.list('users'),
-      sb.list('residents'),
       sb.list('payments'),
       sb.list('finances'),
     ]);
-    DB.users     = (users     || []).map(normalizeUser);
-    DB.residents = (residents || []).map(normalizeResident);
-    DB.payments  = (payments  || []).map(normalizePayment);
-    DB.finances  = (finances  || []).map(normalizeFinance);
+    DB.users    = (users    || []).map(normalizeUser);
+    DB.payments = (payments || []).map(normalizePayment);
+    DB.finances = (finances || []).map(normalizeFinance);
+    syncResidentsFromUsers();
 
     const maxId = Math.max(1,
       ...DB.users.map(u => Number(u.id)||0),
-      ...DB.residents.map(r => Number(r.id)||0),
       ...DB.payments.map(p => Number(p.id)||0),
       ...DB.finances.map(f => Number(f.id)||0)
     );
@@ -117,4 +127,7 @@ function toDbResident(obj) {
   };
 }
 
-window.addEventListener('load', loadDB);
+window.addEventListener('load', async () => {
+  await loadDB();
+  if (typeof restoreSession === 'function') restoreSession();
+});

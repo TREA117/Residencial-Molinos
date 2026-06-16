@@ -95,25 +95,12 @@ async function approveResident(id) {
   const r = DB.residents.find(r=>r.id===id);
   if (!r) return;
   r.status = 'approved';
-  const u = DB.users.find(u=>u.id===r.userId||u.id===r.user_id||u.email===r.email);
-  if (u) { u.deptoStatus='approved'; u.depto_status='approved'; }
+  const u = DB.users.find(u=>u.id===id);
+  if (u) { u.depto_status='approved'; u.deptoStatus='approved'; }
   try {
-    const sb = window.SUPABASE;
-    const client = sb?.client?.();
-    if (sb) {
-      if (r._fromUsers) {
-        // Usuario registrado solo en users, crear fila en residents
-        await sb.insert('residents', {
-          name: r.name, email: r.email, phone: r.phone,
-          depto: r.depto, status: 'approved', fee: r.fee || 1500,
-          user_id: r.userId || r.user_id || null
-        });
-      } else if (client) {
-        await client.from('residents').update({status:'approved'}).eq('id', id);
-      }
-      if (client && u?.id) await client.from('users').update({depto_status:'approved'}).eq('id', u.id);
-    }
-  } catch(e) { console.warn('Supabase approve resident failed', e); }
+    const client = window.SUPABASE?.client?.();
+    if (client) await client.from('users').update({depto_status:'approved'}).eq('id', id);
+  } catch(e) { console.warn('Supabase approve failed', e); }
   renderResidents();
   showToast('✓ Residente '+r.name+' autorizado — Depto '+r.depto);
 }
@@ -122,30 +109,25 @@ async function rejectResident(id) {
   const r = DB.residents.find(r=>r.id===id);
   if (r) {
     r.status = 'rejected';
+    const u = DB.users.find(u=>u.id===id);
+    if (u) { u.depto_status='rejected'; u.deptoStatus='rejected'; }
     try {
-      const sb = window.SUPABASE;
-      const client = sb?.client?.();
-      if (r._fromUsers) {
-        // Solo actualizar users; no hay fila en residents
-        if (client && r.user_id) await client.from('users').update({depto_status:'rejected'}).eq('id', r.user_id);
-      } else if (client) {
-        await client.from('residents').update({status:'rejected'}).eq('id', id);
-        const u = DB.users.find(u=>u.id===r.userId||u.id===r.user_id||u.email===r.email);
-        if (u?.id) await client.from('users').update({depto_status:'rejected'}).eq('id', u.id);
-      }
-    } catch(e) { console.warn('Supabase reject resident failed',e); }
+      const client = window.SUPABASE?.client?.();
+      if (client) await client.from('users').update({depto_status:'rejected'}).eq('id', id);
+    } catch(e) { console.warn('Supabase reject failed',e); }
   }
   renderResidents(); showToast('Residente rechazado','error');
 }
 
 async function deleteResident(id) {
-  if (!confirm('¿Eliminar este residente?')) return;
+  if (!confirm('¿Eliminar este usuario?')) return;
+  DB.users     = DB.users.filter(u=>u.id!==id);
   DB.residents = DB.residents.filter(r=>r.id!==id);
   try {
     const client = window.SUPABASE?.client?.();
-    if (client) await client.from('residents').delete().eq('id',id);
-  } catch(e) { console.warn('Supabase delete resident failed',e); }
-  renderResidents(); showToast('Residente eliminado');
+    if (client) await client.from('users').delete().eq('id', id);
+  } catch(e) { console.warn('Supabase delete user failed',e); }
+  renderResidents(); showToast('Usuario eliminado');
 }
 
 function editResidentModal(id) {
@@ -171,10 +153,13 @@ async function saveEditResident() {
   r.depto  = document.getElementById('editResDepto').value.trim().toUpperCase().replace(/\s+/g,'');
   r.fee    = parseFloat(document.getElementById('editResFee').value)||1500;
   r.status = document.getElementById('editResStatus').value;
+  // Sync back to DB.users
+  const u = DB.users.find(u=>u.id===id);
+  if (u) { u.name=r.name; u.email=r.email; u.phone=r.phone; u.depto=r.depto; u.fee=r.fee; u.depto_status=r.status; u.deptoStatus=r.status; }
   try {
     const client = window.SUPABASE?.client?.();
-    if (client) await client.from('residents').update({name:r.name,email:r.email,phone:r.phone,depto:r.depto,fee:r.fee,status:r.status}).eq('id',id);
-  } catch(e) { console.warn('Supabase update resident failed',e); }
+    if (client) await client.from('users').update({name:r.name,email:r.email,phone:r.phone,depto:r.depto,fee:r.fee,depto_status:r.status}).eq('id',id);
+  } catch(e) { console.warn('Supabase update user failed',e); }
   closeModal('modalEditResident'); renderResidents(); showToast('Residente actualizado ✓');
 }
 
@@ -191,16 +176,21 @@ async function saveNewResident() {
   const fee    = parseFloat(document.getElementById('newResFee').value)||1500;
   const status = document.getElementById('newResStatus').value;
   if (!name||!depto) { showToast('Nombre y departamento son requeridos','error'); return; }
-  const rec = {name,email,phone,depto,status,fee,user_id:null};
   try {
     const sb = window.SUPABASE;
-    if (sb&&sb.config().hasKey) {
-      const {data,error} = await sb.insert('residents',toDbResident(rec));
-      if (error) throw error;
-      const row = Array.isArray(data)?data[0]:data;
-      if (row) DB.residents.push({...rec,id:row.id,userId:null});
-    } else { DB.residents.push({...rec,id:DB.nextId++}); }
-  } catch(e) { console.warn('Supabase insert resident failed',e); DB.residents.push({...rec,id:DB.nextId++}); }
+    if (sb && sb.config().hasKey) {
+      const rows = await sb.insert('users', {
+        name, email, phone, depto, fee, role:'resident',
+        depto_status: status, password_hash: ''
+      });
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      if (row) {
+        const newUser = { ...row, deptoStatus: status, depto_status: status };
+        DB.users.push(newUser);
+        if (typeof syncResidentsFromUsers === 'function') syncResidentsFromUsers();
+      }
+    }
+  } catch(e) { console.warn('Supabase insert user failed',e); showToast('Error al agregar usuario','error'); return; }
   closeModal('modalAddResident'); renderResidents(); showToast('Residente '+name+' agregado ✓');
 }
 

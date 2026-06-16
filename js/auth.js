@@ -5,6 +5,55 @@
 
 let currentUser = null;
 
+/* ── Sesión persistente con timeout de inactividad ─────────── */
+const SESSION_KEY    = 'rm3_session';
+const INACTIVITY_MS  = 30 * 60 * 1000; // 30 minutos
+let inactivityTimer  = null;
+
+function saveSession(user) {
+  localStorage.setItem(SESSION_KEY, JSON.stringify({ user, ts: Date.now() }));
+}
+
+function clearSession() {
+  localStorage.removeItem(SESSION_KEY);
+}
+
+function resetInactivityTimer() {
+  clearTimeout(inactivityTimer);
+  inactivityTimer = setTimeout(() => {
+    doLogout();
+    showAlert('alertAuth', 'Sesión cerrada por inactividad (30 min)', 'info');
+  }, INACTIVITY_MS);
+  // Actualizar timestamp en storage para que sea válido al recargar
+  if (currentUser) {
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ user: currentUser, ts: Date.now() }));
+  }
+}
+
+function startInactivityWatch() {
+  ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach(ev =>
+    document.addEventListener(ev, resetInactivityTimer, { passive: true })
+  );
+  resetInactivityTimer();
+}
+
+function stopInactivityWatch() {
+  clearTimeout(inactivityTimer);
+  ['mousemove', 'keydown', 'click', 'touchstart', 'scroll'].forEach(ev =>
+    document.removeEventListener(ev, resetInactivityTimer)
+  );
+}
+
+function restoreSession() {
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) return;
+  try {
+    const { user, ts } = JSON.parse(raw);
+    if (!user || (Date.now() - ts) > INACTIVITY_MS) { clearSession(); return; }
+    loginUser(user);
+  } catch(e) { clearSession(); }
+}
+
 function switchAuth(mode) {
   ['Login', 'OTP', 'Register'].forEach(m =>
     document.getElementById('form' + m).classList.add('hidden')
@@ -90,25 +139,14 @@ async function doRegister() {
       depto, depto_status: 'pending', fee: 1500
     });
 
-    // Obtener el id real generado por Supabase
-    const userId = Array.isArray(userData) && userData[0] ? userData[0].id : null;
-
-    // Agregar al array local
+    // Agregar al array local y sincronizar residents
     if (Array.isArray(userData) && userData[0]) {
-      DB.users.push({ ...userData[0], deptoStatus: 'pending', pass });
+      const newUser = { ...userData[0], deptoStatus: 'pending', depto_status: 'pending', pass };
+      DB.users.push(newUser);
+      if (typeof syncResidentsFromUsers === 'function') syncResidentsFromUsers();
     }
 
-    // Insertar residente en Supabase
-    const residentData = await sb.insert('residents', {
-      name, email, phone, depto, status: 'pending', fee: 1500,
-      user_id: userId
-    });
-
-    if (Array.isArray(residentData) && residentData[0]) {
-      DB.residents.push(residentData[0]);
-    }
-
-    console.info('📬 Nuevo registro pendiente de autorización:', name, depto, '| user_id:', userId);
+    console.info('📬 Nuevo registro pendiente de autorización:', name, depto);
     showAlert('alertAuth', '✓ Registro enviado. El administrador autorizará tu acceso.', 'success');
     switchAuth('login');
   } catch(err) {
@@ -127,6 +165,8 @@ function loginUser(user) {
   if (!user.deptoStatus  && user.depto_status)  user.deptoStatus  = user.depto_status;
   if (!user.depto_status && user.deptoStatus)   user.depto_status = user.deptoStatus;
   if (!user.pass         && user.password_hash) user.pass         = user.password_hash;
+  saveSession(user);
+  startInactivityWatch();
 
   currentUser = user;
   document.getElementById('authScreen').classList.add('hidden');
@@ -180,6 +220,8 @@ function showPendingApproval() {
 }
 
 function doLogout() {
+  clearSession();
+  stopInactivityWatch();
   currentUser = null;
   document.getElementById('appScreen').classList.add('hidden');
   document.getElementById('authScreen').classList.remove('hidden');
