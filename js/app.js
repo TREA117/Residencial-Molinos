@@ -6,6 +6,12 @@ const fmt     = n => new Intl.NumberFormat('es-MX', { style: 'currency', currenc
 const fmtDate = d => { try { return new Date(d).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' }); } catch(e){ return d||'—'; } };
 let chartFlow = null, chartDist = null;
 
+/* ── DEMO LOGIN HELPER ──────────────────────────────────────── */
+function fillLogin(email, pass) {
+  document.getElementById('loginEmail').value = email;
+  document.getElementById('loginPass').value  = pass;
+}
+
 /* ── NAVIGATION ────────────────────────────────────────────── */
 function goTo(page) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
