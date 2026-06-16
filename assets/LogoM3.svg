@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600">
+  <defs>
+    <linearGradient id="gold" x1="0" x2="1">
+      <stop offset="0%" stop-color="#C89A2B"/>
+      <stop offset="100%" stop-color="#E9DFCE"/>
+    </linearGradient>
+  </defs>
+
+  <circle cx="400" cy="120" r="95" fill="none" stroke="#C89A2B" stroke-width="4"/>
+
+  <g transform="translate(330,40)">
+    <polygon points="70,0 100,20 100,170 70,170" fill="#111"/>
+    <polygon points="40,25 70,10 70,170 40,170" fill="url(#gold)"/>
+    <polygon points="100,25 130,10 130,170 100,170" fill="url(#gold)"/>
+
+    <rect x="0" y="60" width="40" height="110" fill="#222"/>
+    <rect x="130" y="60" width="40" height="110" fill="#222"/>
+
+    <g fill="#ffffff">
+      <rect x="8" y="70" width="8" height="15"/>
+      <rect x="24" y="70" width="8" height="15"/>
+      <rect x="8" y="95" width="8" height="15"/>
+      <rect x="24" y="95" width="8" height="15"/>
+      <rect x="8" y="120" width="8" height="15"/>
+      <rect x="24" y="120" width="8" height="15"/>
+
+      <rect x="138" y="70" width="8" height="15"/>
+      <rect x="154" y="70" width="8" height="15"/>
+      <rect x="138" y="95" width="8" height="15"/>
+      <rect x="154" y="95" width="8" height="15"/>
+      <rect x="138" y="120" width="8" height="15"/>
+      <rect x="154" y="120" width="8" height="15"/>
+    </g>
+  </g>
+
+  <path d="M260 220 Q400 185 540 220" fill="none" stroke="#222" stroke-width="4"/>
+
+  <text x="400" y="310" text-anchor="middle"
+        font-family="Times New Roman, serif"
+        font-size="58" fill="#111" letter-spacing="2">
+    REAL MOLINOS
+  </text>
+
+  <line x1="220" y1="345" x2="340" y2="345" stroke="#C89A2B" stroke-width="4"/>
+  <line x1="460" y1="345" x2="580" y2="345" stroke="#C89A2B" stroke-width="4"/>
+
+  <text x="400" y="360" text-anchor="middle"
+        font-family="Georgia, serif"
+        font-size="60" fill="#C89A2B">3</text>
+
+  <text x="400" y="405" text-anchor="middle"
+        font-family="Arial, sans-serif"
+        font-size="24" letter-spacing="10" fill="#111">
+    PRIVADA
+  </text>
+</svg>

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Real Molinos 3 — Privada</title>
+<link rel="icon" href="assets/LogoM3.svg" type="image/svg+xml">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════
+     AUTH SCREEN
+     ═══════════════════════════════════════════════════════════ -->
+<div id="authScreen">
+  <div class="auth-wrap">
+    <div class="auth-card">
+
+      <!-- Logo centrado -->
+      <div class="auth-logo-wrap">
+        <img src="assets/LogoM3.svg" alt="Real Molinos 3"
+             onerror="this.src='assets/LogoM3.jpg';this.onerror=null;">
+        <div class="auth-logo">Real Molinos 3</div>
+      </div>
+      <div class="auth-divider"></div>
+      <div class="auth-sub">Sistema de gestión de la privada</div>
+
+      <div class="auth-tabs">
+        <button class="auth-tab active" onclick="switchAuth('login')">Iniciar sesión</button>
+        <button class="auth-tab"        onclick="switchAuth('register')">Registrarse</button>
+      </div>
+      <div id="alertAuth"></div>
+
+      <!-- LOGIN -->
+      <div id="formLogin">
+        <div class="field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="tu@correo.com"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
+        <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar</button>
+        <p style="font-size:12px;color:var(--mist);text-align:center;margin-top:10px;cursor:pointer" onclick="showOTP()">¿Prefiero código OTP por correo →</p>
+      </div>
+
+      <!-- OTP -->
+      <div id="formOTP" class="hidden">
+        <div class="field"><label>Correo o teléfono</label><input type="text" id="otpContact" placeholder="tu@correo.com o +52 555 000 0000"></div>
+        <button class="btn btn-secondary btn-full" onclick="sendOTP()">Enviar código</button>
+        <div id="otpCodeField" class="hidden" style="margin-top:1rem">
+          <div class="field"><label>Código de 6 dígitos</label><input type="text" id="otpCode" placeholder="000000" maxlength="6"></div>
+          <button class="btn btn-primary btn-full" onclick="verifyOTP()">Verificar y entrar</button>
+        </div>
+        <p style="font-size:12px;color:var(--mist);text-align:center;margin-top:10px;cursor:pointer" onclick="switchAuth('login')">← Volver al login</p>
+      </div>
+
+      <!-- REGISTER -->
+      <div id="formRegister" class="hidden">
+        <div class="field"><label>Nombre completo</label><input type="text" id="regName" placeholder="Juan García Pérez"></div>
+        <div class="field"><label>Correo electrónico</label><input type="email" id="regEmail" placeholder="tu@correo.com"></div>
+        <div class="field"><label>Número de celular</label><input type="tel" id="regPhone" placeholder="+52 555 000 0000"></div>
+        <div class="field">
+          <label>Número de departamento</label>
+          <input type="text" id="regDepto" placeholder="10H" style="text-transform:uppercase"
+                 oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')">
+          <div class="field-hint">⚠️ Escribe tu departamento en MAYÚSCULAS y SIN ESPACIOS. Ejemplo: 10H, 3B, 201</div>
+        </div>
+        <div class="field"><label>Contraseña</label><input type="password" id="regPass" placeholder="Mínimo 8 caracteres"></div>
+        <button class="btn btn-primary btn-full" onclick="doRegister()">Solicitar acceso</button>
+        <p style="font-size:11px;color:var(--mist);text-align:center;margin-top:10px">Al registrarte, administración recibirá una notificación para autorizar tu acceso.</p>
+      </div>
+
+      <!-- PENDING APPROVAL -->
+      <div id="formPendingApproval" class="hidden">
+        <div class="alert alert-info">
+          <strong>⏳ Acceso pendiente de autorización</strong><br>
+          Tu solicitud fue enviada a administración. Recibirás acceso una vez que sea revisada. Si tienes alguna duda, comunícate con la caseta.
+        </div>
+        <button class="btn btn-secondary btn-full" onclick="doLogout()">Volver al inicio</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     MAIN APP
+     ═══════════════════════════════════════════════════════════ -->
+<div id="appScreen" class="hidden">
+  <div class="app">
+
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-logo-wrap">
+        <img src="assets/LogoM3.svg" alt="RM3" class="sidebar-logo-img"
+             onerror="this.src='assets/LogoM3.jpg';this.onerror=null;">
+        <div>
+          <div class="sidebar-logo-text">Real Molinos 3</div>
+          <div class="sidebar-logo-sub">PRIVADA</div>
+        </div>
+      </div>
+
+      <nav class="nav">
+        <!-- ADMIN NAV -->
+        <div id="navAdminFull" class="hidden">
+          <div class="nav-section">Principal</div>
+          <div class="nav-item active" onclick="goTo('dashboard')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <span>Dashboard</span>
+          </div>
+          <div class="nav-section">Administración</div>
+          <div id="navAdmin">
+            <div class="nav-item" onclick="goTo('residents')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+              <span>Residentes <span id="pendingResCount" class="hidden" style="background:var(--gold);color:var(--navy);font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">0</span></span>
+            </div>
+            <div class="nav-item" onclick="goTo('payments')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+              <span>Comprobantes <span id="pendingPayCount" class="hidden" style="background:var(--gold);color:var(--navy);font-size:10px;padding:1px 6px;border-radius:99px;margin-left:4px">0</span></span>
+            </div>
+            <div class="nav-item" onclick="goTo('vouchers')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+              <span>Archivos</span>
+            </div>
+          </div>
+          <div class="nav-section">Finanzas</div>
+          <div class="nav-item" onclick="goTo('finances')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            <span>Ingresos / Egresos</span>
+          </div>
+          <div class="nav-item" onclick="goTo('reports')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Reportes</span>
+          </div>
+          <div class="nav-section">Configuración</div>
+          <div class="nav-item" onclick="goTo('editContacts')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            <span>Editar contactos</span>
+          </div>
+        </div>
+
+        <!-- RESIDENT NAV -->
+        <div id="navResident" class="hidden">
+          <div class="nav-item active" onclick="goTo('myPayments')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            <span>Mis pagos</span>
+          </div>
+          <div class="nav-item" onclick="goTo('myAccount')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <span>Estado de cuenta</span>
+          </div>
+          <div class="nav-item" onclick="goTo('contacts')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.69a16 16 0 0 0 6 6l.72-.97a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 21.28 16z"/></svg>
+            <span>Contactos</span>
+          </div>
+        </div>
+      </nav>
+
+      <div class="sidebar-user">
+        <div class="sidebar-user-name" id="sidebarName">—</div>
+        <div class="sidebar-user-role" id="sidebarRole">—</div>
+        <div class="sidebar-user-btn" onclick="doLogout()">Cerrar sesión</div>
+      </div>
+    </div><!-- /sidebar -->
+
+    <!-- MAIN CONTENT -->
+    <div class="main">
+
+      <!-- ── DASHBOARD ──────────────────────────────── -->
+      <div id="pageDashboard" class="page active">
+        <div class="page-header">
+          <div class="page-title">Dashboard</div>
+          <div class="page-sub" id="dashWelcome">Bienvenido</div>
+        </div>
+        <div class="metrics" id="metricsArea"></div>
+        <div class="chart-grid">
+          <div class="card">
+            <div class="card-head"><span class="card-title">Flujo mensual</span></div>
+            <div class="card-body"><div class="chart-wrap"><canvas id="chartFlow"></canvas></div></div>
+          </div>
+          <div class="card">
+            <div class="card-head"><span class="card-title">Distribución egresos</span></div>
+            <div class="card-body"><div class="chart-wrap"><canvas id="chartDist"></canvas></div></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Actividad reciente</span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Fecha</th><th>Descripción</th><th>Tipo</th><th>Monto</th><th>Estado</th></tr></thead>
+            <tbody id="recentActivity"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ── RESIDENTS (admin) ──────────────────────── -->
+      <div id="pageResidents" class="page">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+          <div><div class="page-title">Residentes</div><div class="page-sub">Gestiona y autoriza accesos</div></div>
+          <button class="btn btn-gold btn-sm" onclick="openModalAddResident()">+ Agregar</button>
+        </div>
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-head"><span class="card-title">Solicitudes pendientes <span id="pendingBadge" class="badge badge-pending">0</span></span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Nombre</th><th>Depto</th><th>Correo</th><th>Teléfono</th><th>Fecha</th><th>Acciones</th></tr></thead>
+            <tbody id="tblPendingResidents"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Todos los residentes</span>
+            <input type="text" id="searchResident" placeholder="Buscar..." style="width:180px;padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" oninput="renderResidents()">
+          </div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Nombre</th><th>Depto</th><th>Estado</th><th>Correo</th><th>Teléfono</th><th>Acciones</th></tr></thead>
+            <tbody id="tblAllResidents"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ── PAYMENTS (admin) ───────────────────────── -->
+      <div id="pagePayments" class="page">
+        <div class="page-header"><div class="page-title">Comprobantes de pago</div><div class="page-sub">Verifica y genera recibos</div></div>
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-head"><span class="card-title">Pendientes de revisión <span id="payPendingBadge" class="badge badge-pending">0</span></span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Residente</th><th>Depto</th><th>Mes</th><th>Monto</th><th>Fecha pago</th><th>Enviado</th><th>Comprobante</th><th>Acciones</th></tr></thead>
+            <tbody id="tblPendingPayments"></tbody>
+          </table></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Historial</span>
+            <select id="filterPayMonth" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderPayments()">
+              <option value="">Todos los meses</option>
+              <option>Enero 2026</option><option>Febrero 2026</option><option>Marzo 2026</option>
+              <option>Abril 2026</option><option>Mayo 2026</option><option>Junio 2026</option>
+            </select>
+          </div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Residente</th><th>Depto</th><th>Mes</th><th>Monto</th><th>Estado</th><th>Recibo</th></tr></thead>
+            <tbody id="tblAllPayments"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ── VOUCHERS / ARCHIVOS (admin) ───────────── -->
+      <div id="pageVouchers" class="page">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div><div class="page-title">Archivos por departamento</div><div class="page-sub">Comprobantes y recibos organizados en carpetas</div></div>
+          <button class="btn btn-gold btn-sm" onclick="downloadAndCleanup()">⬇ Descargar y limpiar</button>
+        </div>
+        <div id="vouchersArea"></div>
+      </div>
+
+      <!-- ── FINANCES (admin) ───────────────────────── -->
+      <div id="pageFinances" class="page">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div><div class="page-title">Ingresos y egresos</div><div class="page-sub">Registro completo del flujo financiero</div></div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <button class="btn btn-success btn-sm" onclick="openModalTransaction('income')">+ Ingreso</button>
+            <button class="btn btn-danger btn-sm"  onclick="openModalTransaction('expense')">+ Egreso</button>
+            <button class="btn btn-secondary btn-sm" onclick="openModalImport()">⬆ Importar CSV</button>
+            <button class="btn btn-secondary btn-sm" onclick="exportCSV()">⬇ Exportar</button>
+          </div>
+        </div>
+        <div class="metrics" id="finMetrics"></div>
+        <div class="card">
+          <div class="card-head">
+            <span class="card-title">Transacciones</span>
+            <div style="display:flex;gap:8px">
+              <select id="filterFinType" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
+                <option value="">Todo</option><option value="income">Ingresos</option><option value="expense">Egresos</option>
+              </select>
+              <select id="filterFinCat" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
+                <option value="">Todas las categorías</option>
+              </select>
+            </div>
+          </div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Referencia</th><th>Acciones</th></tr></thead>
+            <tbody id="tblFinances"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ── REPORTS (admin) ────────────────────────── -->
+      <div id="pageReports" class="page">
+        <div class="page-header"><div class="page-title">Reportes</div><div class="page-sub">Estado de cobros del mes en curso</div></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Estado de cobros — mes actual</span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Depto</th><th>Residente</th><th>Cuota</th><th>Estado</th><th>Último pago</th></tr></thead>
+            <tbody id="tblReport"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ── EDIT CONTACTS (admin) ──────────────────── -->
+      <div id="pageEditContacts" class="page">
+        <div class="page-header"><div class="page-title">Editar contactos</div><div class="page-sub">Los cambios se reflejan en la vista de residentes</div></div>
+        <div id="editContactsArea"></div>
+      </div>
+
+      <!-- ── MY PAYMENTS (resident) ─────────────────── -->
+      <div id="pageMyPayments" class="page">
+        <div id="paymentDayBanner" class="hidden"></div>
+        <div id="deptoVerifAlert"></div>
+        <div id="residentBanner" style="background:var(--navy);border-radius:var(--r-lg);padding:1.25rem 1.5rem;margin-bottom:1.5rem;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+          <div>
+            <div style="font-size:11px;color:var(--mist);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Mi departamento</div>
+            <div style="font-size:28px;font-weight:700;color:var(--gold);letter-spacing:-0.5px" id="resDeptoNum">—</div>
+            <div style="font-size:12px;color:var(--gold-light);margin-top:2px" id="resDeptoStatus">—</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-size:11px;color:var(--mist);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px">Cuota mensual</div>
+            <div style="font-size:22px;font-weight:700;color:var(--gold)" id="resFeeDisplay">—</div>
+          </div>
+        </div>
+        <div id="uploadCTAArea" style="margin-bottom:1.5rem">
+          <div style="background:var(--white);border:2px dashed var(--gold);border-radius:var(--r-lg);padding:2rem;text-align:center;cursor:pointer" onclick="openModalUploadPayment()">
+            <div style="width:52px;height:52px;background:var(--gold-light);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 12px">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            </div>
+            <div style="font-size:15px;font-weight:600;color:var(--navy);margin-bottom:4px">Subir comprobante de pago</div>
+            <div style="font-size:13px;color:var(--mist)">Adjunta tu transferencia o depósito del mes</div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Mis pagos</span></div>
+          <div class="tbl-wrap"><table>
+            <thead><tr><th>Mes</th><th>Monto</th><th>Fecha pago</th><th>Enviado</th><th>Estado</th><th>Recibo</th></tr></thead>
+            <tbody id="tblMyPayments"></tbody>
+          </table></div>
+        </div>
+      </div>
+
+      <!-- ── MY ACCOUNT (resident) ──────────────────── -->
+      <div id="pageMyAccount" class="page">
+        <div class="page-header"><div class="page-title">Estado de cuenta</div><div class="page-sub">Historial de pagos y adeudos</div></div>
+        <div id="accountArea"></div>
+      </div>
+
+      <!-- ── CONTACTS (resident) ────────────────────── -->
+      <div id="pageContacts" class="page">
+        <div class="page-header"><div class="page-title">Contactos</div><div class="page-sub">Administración y caseta de Real Molinos 3</div></div>
+        <div id="contactsArea"></div>
+      </div>
+
+    </div><!-- /main -->
+  </div><!-- /app -->
+</div><!-- /appScreen -->
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     MODALS
+     ═══════════════════════════════════════════════════════════ -->
+
+<!-- Receipt -->
+<div class="modal-overlay" id="modalReceipt">
+  <div class="modal" style="max-width:520px">
+    <div class="modal-head"><span class="modal-title">Recibo de pago</span><button class="modal-close" onclick="closeModal('modalReceipt')">✕</button></div>
+    <div class="modal-body"><div id="receiptContent"></div></div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="printReceipt()">🖨 Imprimir / PDF</button>
+      <button class="btn btn-primary"   onclick="closeModal('modalReceipt')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Transaction -->
+<div class="modal-overlay" id="modalTransaction">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title" id="transModalTitle">Nuevo ingreso</span><button class="modal-close" onclick="closeModal('modalTransaction')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="transType" value="income">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Fecha</label><input type="date" id="transDate"></div>
+        <div class="field"><label>Monto (MXN)</label><input type="number" id="transAmount" placeholder="1500.00" step="0.01"></div>
+      </div>
+      <div class="field"><label>Descripción</label><input type="text" id="transDesc" placeholder="Cuota mantenimiento depto 10H"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Categoría</label>
+          <select id="transCat"><option>Mantenimiento</option><option>Limpieza</option><option>Seguridad</option><option>Reparaciones</option><option>Servicios</option><option>Administración</option><option>Otros</option></select>
+        </div>
+        <div class="field"><label>Referencia / Factura</label><input type="text" id="transRef" placeholder="REF-001"></div>
+      </div>
+      <div class="field"><label>Notas (opcional)</label><textarea id="transNotes" placeholder="Información adicional..."></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modalTransaction')">Cancelar</button>
+      <button class="btn btn-gold" onclick="saveTransaction()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Upload Payment -->
+<div class="modal-overlay" id="modalUploadPayment">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">Subir comprobante de pago</span><button class="modal-close" onclick="closeModal('modalUploadPayment')">✕</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Mes de pago</label>
+          <select id="payMonth">
+            <option>Enero 2026</option><option>Febrero 2026</option><option>Marzo 2026</option>
+            <option>Abril 2026</option><option>Mayo 2026</option><option selected>Junio 2026</option>
+          </select>
+        </div>
+        <div class="field"><label>Monto pagado (MXN)</label><input type="number" id="payAmount" placeholder="1500.00"></div>
+      </div>
+      <div class="field"><label>Fecha en que realizaste el pago</label><input type="date" id="payDate"></div>
+      <div class="field">
+        <label>Comprobante (imagen o PDF) *</label>
+        <div class="upload-zone" onclick="simulateUpload()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div>Toca para seleccionar imagen o PDF</div>
+          <div class="uf-name" id="uploadFileName">Sin archivo seleccionado</div>
+        </div>
+        <input type="file" id="payFile" accept="image/*,.pdf" style="display:none" onchange="fileSelected(this)">
+      </div>
+      <div class="field"><label>Referencia bancaria (opcional)</label><input type="text" id="payRef" placeholder="Últimos 6 dígitos de operación"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modalUploadPayment')">Cancelar</button>
+      <button class="btn btn-gold" onclick="savePayment()">Enviar comprobante</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Voucher -->
+<div class="modal-overlay" id="modalViewVoucher">
+  <div class="modal" style="max-width:560px">
+    <div class="modal-head"><span class="modal-title">Comprobante de pago</span><button class="modal-close" onclick="closeModal('modalViewVoucher')">✕</button></div>
+    <div class="modal-body" id="voucherBody"></div>
+    <div class="modal-foot" id="voucherFoot"></div>
+  </div>
+</div>
+
+<!-- Add Resident -->
+<div class="modal-overlay" id="modalAddResident">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">Agregar residente</span><button class="modal-close" onclick="closeModal('modalAddResident')">✕</button></div>
+    <div class="modal-body">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Nombre completo</label><input type="text" id="newResName" placeholder="Juan García"></div>
+        <div class="field"><label>Departamento</label><input type="text" id="newResDepto" placeholder="10H" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Correo</label><input type="email" id="newResEmail" placeholder="juan@correo.com"></div>
+        <div class="field"><label>Teléfono</label><input type="tel" id="newResPhone" placeholder="+52 555 000 0000"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Cuota mensual (MXN)</label><input type="number" id="newResFee" placeholder="1500" value="1500"></div>
+        <div class="field"><label>Estado</label>
+          <select id="newResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modalAddResident')">Cancelar</button>
+      <button class="btn btn-gold" onclick="saveNewResident()">Agregar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Resident -->
+<div class="modal-overlay" id="modalEditResident">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">Editar residente</span><button class="modal-close" onclick="closeModal('modalEditResident')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="editResId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Nombre</label><input type="text" id="editResName"></div>
+        <div class="field"><label>Departamento</label><input type="text" id="editResDepto" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Correo</label><input type="email" id="editResEmail"></div>
+        <div class="field"><label>Teléfono</label><input type="tel" id="editResPhone"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Cuota (MXN)</label><input type="number" id="editResFee"></div>
+        <div class="field"><label>Estado</label>
+          <select id="editResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option><option value="rejected">Rechazado</option></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modalEditResident')">Cancelar</button>
+      <button class="btn btn-gold" onclick="saveEditResident()">Guardar cambios</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import CSV -->
+<div class="modal-overlay" id="modalImport">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">Importar transacciones</span><button class="modal-close" onclick="closeModal('modalImport')">✕</button></div>
+    <div class="modal-body">
+      <div class="csv-section">
+        <div class="csv-title">Opciones de importación</div>
+        <div class="csv-desc">Selecciona el método para cargar transacciones masivas</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:1.25rem">
+        <div class="card" style="padding:12px;cursor:pointer;border:2px solid var(--gold)" onclick="selectImportMethod('csv')">
+          <div style="font-size:13px;font-weight:600;color:var(--navy)">📄 Archivo CSV</div>
+          <div style="font-size:12px;color:var(--mist);margin-top:3px">Columnas: fecha, descripcion, tipo, monto, categoria, referencia</div>
+        </div>
+        <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('paste')">
+          <div style="font-size:13px;font-weight:600;color:var(--navy)">📋 Pegar desde Excel</div>
+          <div style="font-size:12px;color:var(--mist);margin-top:3px">Copia y pega filas separadas por tabulador</div>
+        </div>
+      </div>
+      <div id="importMethodArea"></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modalImport')">Cerrar</button>
+      <button class="btn btn-gold" id="btnDoImport" style="display:none" onclick="doImport()">Importar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Folder Modal -->
+<div class="modal-overlay" id="modalFolder">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-head"><span class="modal-title" id="folderTitle">Archivos</span><button class="modal-close" onclick="closeModal('modalFolder')">✕</button></div>
+    <div class="modal-body" id="folderBody"></div>
+    <div class="modal-foot"><button class="btn btn-secondary" onclick="closeModal('modalFolder')">Cerrar</button></div>
+  </div>
+</div>
+
+
+<!-- ═══════════════════════════════════════════════════════════
+     SCRIPTS
+     ═══════════════════════════════════════════════════════════ -->
+<script>
+  window.SUPABASE_CONFIG = {
+    url: 'https://qxjuztctbpwymmskdyqw.supabase.co/rest/v1/',
+    key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4anV6dGN0YnB3eW1tc2tkeXF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNjg5NjAsImV4cCI6MjA5Njg0NDk2MH0.PZFOWDjcpeohOm9yXldpH3QzaQs2g0rIqx07_UHcwhs'
+  };
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
+<script src="js/supabase.js"></script>
+<script src="js/db.js"></script>
+<script src="js/data.js"></script>
+<script src="js/auth.js"></script>
+<script src="js/app.js"></script>
+<script src="js/admin.js"></script>
+</body>
+</html>
