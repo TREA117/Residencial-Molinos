@@ -127,6 +127,18 @@ function renderMyPayments() {
     if (ctaEl)   { ctaEl.style.opacity = '1'; ctaEl.style.pointerEvents = 'auto'; }
   }
 
+  const notifEl = document.getElementById('userNotifications');
+  if (notifEl) {
+    const myNotifs = DB.notifications.filter(n =>
+      (n.userId === currentUser.id || n.user_id === currentUser.id) && !n.isRead && !n.is_read
+    );
+    notifEl.innerHTML = myNotifs.map(n => `
+      <div class="alert alert-error" style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px">
+        <span>🔔 ${n.message}</span>
+        <button class="btn btn-secondary btn-sm" onclick="markNotificationRead(${n.id})">Marcar como leído</button>
+      </div>`).join('');
+  }
+
   const myPays = DB.payments.filter(p =>
     p.residentId === currentUser.id || p.resident_id === currentUser.id ||
     p.residentName === currentUser.name || p.resident_name === currentUser.name
@@ -147,6 +159,20 @@ function renderMyPayments() {
       </tr>`).join('') ||
       '<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin pagos registrados</td></tr>';
   }
+}
+
+async function markNotificationRead(id) {
+  const n = DB.notifications.find(n=>n.id===id);
+  if (!n) return;
+  try {
+    await window.SUPABASE.update('notifications', id, { is_read: true });
+    n.isRead = true; n.is_read = true;
+  } catch(e) {
+    console.error('Supabase mark notification read failed', e);
+    showToast('Error al actualizar notificación','error');
+    return;
+  }
+  renderMyPayments();
 }
 
 /* ── MY ACCOUNT STATEMENT (estado de cuenta) ───────────────── */

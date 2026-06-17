@@ -210,7 +210,7 @@ async function saveNewResident() {
 function renderPayments() {
   const month   = document.getElementById('filterPayMonth')?.value||'';
   const pending = DB.payments.filter(p=>p.status==='pending');
-  const all     = DB.payments.filter(p=>!month||p.month===month);
+  const all     = DB.payments.filter(p=>p.status!=='rejected').filter(p=>!month||p.month===month);
   const ppb = document.getElementById('payPendingBadge');
   if (ppb) ppb.textContent = pending.length;
 
@@ -279,15 +279,44 @@ async function approvePayment(id) {
 
 async function rejectPayment(id) {
   const p = DB.payments.find(p=>p.id===id);
-  if (p) {
-    try {
-      await window.SUPABASE.update('payments', id, { status: 'rejected' });
-      p.status='rejected';
-    } catch(e) {
-      console.error('Supabase reject payment failed', e);
-      showToast('Error al rechazar el pago: '+(e?.message||e), 'error');
-      return;
+  if (!p) return;
+
+  const voucherUrl = p.voucherUrl || p.voucher_url || null;
+  const client = window.SUPABASE?.client?.();
+
+  try {
+    if (client && voucherUrl) {
+      const marker = '/comprobantes/';
+      const idx = voucherUrl.indexOf(marker);
+      if (idx !== -1) {
+        const path = decodeURIComponent(voucherUrl.slice(idx + marker.length));
+        const { error: rmError } = await client.storage.from('comprobantes').remove([path]);
+        if (rmError) console.warn('No se pudo eliminar la imagen del storage', rmError);
+      }
     }
+
+    await window.SUPABASE.update('payments', id, { status: 'rejected', voucher_url: null });
+    p.status = 'rejected';
+    p.voucherUrl = null; p.voucher_url = null;
+
+    const residentId = p.residentId || p.resident_id;
+    if (residentId) {
+      try {
+        const notifRows = await window.SUPABASE.insert('notifications', {
+          user_id: residentId,
+          message: `Tu comprobante de ${p.month||'el mes'} fue rechazado por administración. Sube un nuevo comprobante.`,
+          is_read: false,
+        });
+        const notifRow = Array.isArray(notifRows) ? notifRows[0] : notifRows;
+        if (notifRow) DB.notifications.push(normalizeNotification(notifRow));
+      } catch(notifErr) {
+        console.warn('No se pudo crear la notificación (¿existe la tabla notifications?)', notifErr);
+      }
+    }
+  } catch(e) {
+    console.error('Supabase reject payment failed', e);
+    showToast('Error al rechazar el pago: '+(e?.message||e), 'error');
+    return;
   }
   renderPayments(); showToast('Comprobante rechazado','error'); updatePendingCounts();
 }

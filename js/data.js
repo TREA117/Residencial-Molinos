@@ -31,6 +31,15 @@ function normalizeFinance(f) {
     ref:      f.ref      || f.reference   || '',
   };
 }
+function normalizeNotification(n) {
+  if (!n) return n;
+  return { ...n,
+    userId: n.userId !== undefined ? n.userId : n.user_id,
+    user_id: n.user_id !== undefined ? n.user_id : n.userId,
+    isRead: n.isRead !== undefined ? n.isRead : !!n.is_read,
+    is_read: n.is_read !== undefined ? n.is_read : !!n.isRead,
+  };
+}
 
 /* Construye DB.residents como vista de DB.users (solo no-admin) */
 function syncResidentsFromUsers() {
@@ -51,14 +60,16 @@ async function loadDB() {
     return;
   }
   try {
-    const [users, payments, finances] = await Promise.all([
+    const [users, payments, finances, notifications] = await Promise.all([
       sb.list('users'),
       sb.list('payments'),
       sb.list('finances'),
+      sb.list('notifications').catch(e => { console.warn('Tabla notifications no disponible', e); return []; }),
     ]);
-    DB.users    = (users    || []).map(normalizeUser);
-    DB.payments = (payments || []).map(normalizePayment);
-    DB.finances = (finances || []).map(normalizeFinance);
+    DB.users         = (users         || []).map(normalizeUser);
+    DB.payments      = (payments      || []).map(normalizePayment);
+    DB.finances      = (finances      || []).map(normalizeFinance);
+    DB.notifications = (notifications || []).map(normalizeNotification);
     syncResidentsFromUsers();
 
     const maxId = Math.max(1,
@@ -70,7 +81,8 @@ async function loadDB() {
 
     console.info('✅ DB cargada desde Supabase', {
       users: DB.users.length, residents: DB.residents.length,
-      payments: DB.payments.length, finances: DB.finances.length
+      payments: DB.payments.length, finances: DB.finances.length,
+      notifications: DB.notifications.length
     });
 
     if (DB.users.length === 0)

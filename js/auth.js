@@ -7,7 +7,7 @@ let currentUser = null;
 
 /* ── Sesión persistente con timeout de inactividad ─────────── */
 const SESSION_KEY    = 'rm3_session';
-const INACTIVITY_MS  = 30 * 60 * 1000; // 30 minutos
+const INACTIVITY_MS  = 10 * 60 * 1000; // 10 minutos
 let inactivityTimer  = null;
 
 function saveSession(user) {
@@ -22,7 +22,7 @@ function resetInactivityTimer() {
   clearTimeout(inactivityTimer);
   inactivityTimer = setTimeout(() => {
     doLogout();
-    showAlert('alertAuth', 'Sesión cerrada por inactividad (30 min)', 'info');
+    showAlert('alertAuth', 'Sesión cerrada por inactividad (10 min)', 'info');
   }, INACTIVITY_MS);
   // Actualizar timestamp en storage para que sea válido al recargar
   if (currentUser) {

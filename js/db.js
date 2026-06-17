@@ -8,6 +8,7 @@ const DB = {
   residents: [],
   payments: [],
   finances: [],
+  notifications: [],
   contacts: {
     admin: {
       name: 'Administración Real Molinos 3',
