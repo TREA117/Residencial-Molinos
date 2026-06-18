@@ -437,7 +437,7 @@ function renderVouchers() {
 
   area.innerHTML = `
     <div class="alert alert-gold" style="margin-bottom:1.5rem">
-      📥 <strong>Descarga y limpieza sin restricción de fecha (modo prueba).</strong> Los comprobantes aprobados de meses anteriores se eliminarán automáticamente al usar "Descargar y limpiar".
+      📥 <strong>Descarga y limpieza total (modo prueba).</strong> Todos los comprobantes aprobados guardados se descargarán en un ZIP y luego se eliminarán automáticamente al usar "Descargar y limpiar".
     </div>
     <div class="folder-grid">
       ${Object.entries(byDepto).sort(([a],[b])=>a.localeCompare(b)).map(([depto,pays])=>`
@@ -495,28 +495,20 @@ async function downloadAndCleanup() {
     return;
   }
 
-  const today             = new Date();
-  const currMonthStartStr = new Date(today.getFullYear(), today.getMonth(),     1).toISOString().split('T')[0];
-  const prevMonthStart    = new Date(today.getFullYear(), today.getMonth() - 1, 1);
-  const prevMonthStartStr = prevMonthStart.toISOString().split('T')[0];
+  const today = new Date();
 
-  // Comprobantes aprobados que caen exactamente en el mes anterior
-  const toArchive = DB.payments.filter(p => {
-    if (!(p.residentId||p.resident_id)) return false;
-    if (p.status !== 'approved') return false;
-    const d = p.approvedDate||p.approved_date||'';
-    return d && d >= prevMonthStartStr && d < currMonthStartStr;
-  });
+  // Todos los comprobantes aprobados de residentes guardados actualmente
+  const toArchive = DB.payments.filter(p =>
+    (p.residentId||p.resident_id) && p.status === 'approved'
+  );
 
   if (toArchive.length === 0) {
-    showToast('No hay comprobantes aprobados del mes anterior para archivar','error');
+    showToast('No hay comprobantes aprobados para archivar','error');
     return;
   }
 
-  const monthLabel = prevMonthStart
-    .toLocaleDateString('es-MX', { month:'long', year:'numeric' })
-    .replace(/^./, c => c.toUpperCase());
-  const folderName = `Reporte-${monthLabel}`.replace(/\s+/g,'-');
+  const dateLabel  = today.toISOString().split('T')[0];
+  const folderName = `Reporte-Comprobantes-${dateLabel}`;
 
   showToast('Generando ZIP, esto puede tardar unos segundos…');
 

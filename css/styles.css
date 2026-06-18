@@ -371,7 +371,6 @@ table tr:hover td { background: var(--gold-light); }
   border-bottom: 2px solid var(--gold);
 }
 .receipt-logo { font-size: 16px; font-weight: 700; color: var(--navy); }
-.receipt-logo-img { height: 50px; width: auto; margin-bottom: 4px; }
 .receipt-num { font-size: 12px; color: var(--c-text-2); text-align: right; }
 .receipt-row {
   display: flex; justify-content: space-between;

@@ -348,7 +348,6 @@ function buildReceiptHTML(p) {
       <div class="receipt-content">
         <div class="receipt-header">
           <div>
-            <img src="assets/LogoM3.svg" alt="Real Molinos 3" class="receipt-logo-img" onerror="this.style.display='none'">
             <div class="receipt-logo">Real Molinos 3</div>
             <div style="font-size:10px;color:var(--mist)">Privada</div>
           </div>
@@ -430,6 +429,17 @@ async function downloadReceipt(p) {
   }
 }
 
+/* Espera a que todas las <img> dentro de un contenedor terminen de cargar
+   (o fallen) antes de que html2canvas tome la foto — si no, captura el
+   recibo antes de que la marca de agua/logo haya cargado y sale en blanco. */
+function waitForImages(container) {
+  const imgs = Array.from(container.querySelectorAll('img'));
+  return Promise.all(imgs.map(img => img.complete ? Promise.resolve() : new Promise(resolve => {
+    img.addEventListener('load', resolve, { once: true });
+    img.addEventListener('error', resolve, { once: true });
+  })));
+}
+
 /* Renderiza el recibo a una imagen JPEG comprimida (peso mínimo) */
 async function generateReceiptImageBlob(p) {
   const container = document.createElement('div');
@@ -441,6 +451,7 @@ async function generateReceiptImageBlob(p) {
   container.innerHTML = buildReceiptHTML(p);
   document.body.appendChild(container);
   try {
+    await waitForImages(container);
     const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
     return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
   } finally {
