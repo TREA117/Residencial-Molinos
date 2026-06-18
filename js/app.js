@@ -384,6 +384,21 @@ function updateReceiptDownloadButton(p) {
   btn.onclick = () => downloadReceipt(p);
 }
 
+/* ── Descarga genérica de archivos (recibos, comprobantes) ───── */
+function downloadBlob(blob, filename) {
+  const blobUrl = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(blobUrl);
+}
+
+async function downloadUrlAsFile(url, filename) {
+  const res = await fetch(url);
+  const blob = await res.blob();
+  downloadBlob(blob, filename);
+}
+
 async function downloadReceipt(p) {
   const btn = document.getElementById('btnDownloadReceipt');
   const recNum = p.receiptNum || p.receipt_num || 'recibo';
@@ -391,12 +406,11 @@ async function downloadReceipt(p) {
   if (btn) { btn.disabled = true; btn.textContent = '⬇ Descargando...'; }
   try {
     const url = p.receiptUrl || p.receipt_url || null;
-    let blob;
     if (url) {
-      const res = await fetch(url);
-      blob = await res.blob();
+      await downloadUrlAsFile(url, fileName);
     } else {
-      blob = await generateReceiptImageBlob(p);
+      const blob = await generateReceiptImageBlob(p);
+      downloadBlob(blob, fileName);
       // Sube en segundo plano para que la próxima vez no haya que regenerarlo
       uploadReceiptImage(p, blob)
         .then(newUrl => {
@@ -405,11 +419,6 @@ async function downloadReceipt(p) {
         })
         .catch(e => console.warn('No se pudo guardar el recibo en Storage', e));
     }
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl; a.download = fileName;
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(blobUrl);
   } catch (e) {
     console.error('No se pudo descargar el recibo', e);
     showToast('No se pudo generar el recibo', 'error');

@@ -389,9 +389,28 @@ function viewVoucher(id) {
         <div style="font-size:12px;color:var(--mist)">${p.month||'—'} · ${fmt(p.amount)} · Fecha pago: ${p.paymentDate||p.payment_date?fmtDate(p.paymentDate||p.payment_date):'—'} · Enviado: ${fmtDate(p.sentDate||p.sent_date)}</div>
       </div>
     </div>`;
-  document.getElementById('voucherFoot').innerHTML = `
-    <button class="btn btn-danger btn-sm" onclick="rejectPayment(${id});closeModal('modalViewVoucher')">✕ Rechazar</button>
-    <button class="btn btn-gold" onclick="approvePayment(${id});closeModal('modalViewVoucher')">✓ Aprobar y generar recibo</button>`;
+
+  const buttons = [];
+  if (imgUrl) buttons.push(`<button class="btn btn-secondary" id="btnDownloadVoucher">⬇ Descargar</button>`);
+  if (p.status === 'pending') {
+    buttons.push(`<button class="btn btn-danger btn-sm" onclick="rejectPayment(${id});closeModal('modalViewVoucher')">✕ Rechazar</button>`);
+    buttons.push(`<button class="btn btn-gold" onclick="approvePayment(${id});closeModal('modalViewVoucher')">✓ Aprobar y generar recibo</button>`);
+  }
+  buttons.push(`<button class="btn btn-primary" onclick="closeModal('modalViewVoucher')">Cerrar</button>`);
+  document.getElementById('voucherFoot').innerHTML = buttons.join('');
+
+  if (imgUrl) {
+    const btn = document.getElementById('btnDownloadVoucher');
+    const ext = (imgUrl.split('?')[0].split('.').pop() || 'jpg').slice(0,4);
+    const filename = `comprobante-${(p.depto||'SIN-DEPTO')}-${(p.month||'')}`.replace(/\s+/g,'_') + '.' + ext;
+    btn.onclick = async () => {
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = '⬇ Descargando...';
+      try { await downloadUrlAsFile(imgUrl, filename); }
+      catch(e) { console.error('No se pudo descargar el comprobante', e); showToast('No se pudo descargar el comprobante','error'); }
+      finally { btn.disabled = false; btn.textContent = orig; }
+    };
+  }
+
   openModal('modalViewVoucher');
 }
 
@@ -408,15 +427,9 @@ function renderVouchers() {
     byDepto[d].push(p);
   });
 
-  const today   = new Date();
-  const day     = today.getDate();
-  const canDownload = day >= 10 && day <= 15;
-
   area.innerHTML = `
-    <div class="alert alert-${canDownload?'gold':'info'}" style="margin-bottom:1.5rem">
-      ${canDownload
-        ?`📥 <strong>Ventana de descarga activa (días 10–15).</strong> Descarga los comprobantes antes del día 15. Los archivos anteriores al mes en curso se eliminarán automáticamente al descargar o el día 15.`
-        :`ℹ️ La descarga masiva de comprobantes está disponible del día 10 al 15 de cada mes.`}
+    <div class="alert alert-gold" style="margin-bottom:1.5rem">
+      📥 <strong>Descarga y limpieza sin restricción de fecha (modo prueba).</strong> Los comprobantes aprobados de meses anteriores se eliminarán automáticamente al usar "Descargar y limpiar".
     </div>
     <div class="folder-grid">
       ${Object.entries(byDepto).sort(([a],[b])=>a.localeCompare(b)).map(([depto,pays])=>`
@@ -446,7 +459,7 @@ function openDeptoFolder(depto) {
             <td>${p.month||'—'}</td><td>${fmt(p.amount)}</td>
             <td><span class="badge ${p.status==='approved'?'badge-approved':p.status==='pending'?'badge-pending':'badge-rejected'}">${p.status==='approved'?'Aprobado':p.status==='pending'?'Pendiente':'Rechazado'}</span></td>
             <td style="display:flex;gap:4px">
-              ${p.voucherUrl||p.voucher_url?`<button class="btn btn-secondary btn-sm" onclick="window.open('${p.voucherUrl||p.voucher_url}','_blank')">Ver</button>`:''}
+              ${p.voucherUrl||p.voucher_url?`<button class="btn btn-secondary btn-sm" onclick="viewVoucher(${p.id})">Ver</button>`:''}
               ${p.receiptNum||p.receipt_num?`<button class="btn btn-gold btn-sm" onclick="showReceipt(${p.id})">Recibo</button>`:''}
               <button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id},'${depto}')">🗑</button>
             </td>
@@ -460,8 +473,6 @@ function openDeptoFolder(depto) {
 /* ── DOWNLOAD & AUTO-CLEANUP ────────────────────────────────── */
 async function downloadAndCleanup() {
   const today = new Date();
-  const day   = today.getDate();
-  if (day < 10 || day > 15) { showToast('La descarga solo está disponible del día 10 al 15','error'); return; }
 
   // Export CSV of payments
   const headers = 'Recibo,Depto,Residente,Mes,Monto,Fecha Pago,Fecha Aprobación,Comprobante';
