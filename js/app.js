@@ -344,7 +344,7 @@ function buildReceiptHTML(p) {
 
   return `
     <div class="receipt">
-      <img src="assets/LogoM3.svg" alt="" class="receipt-watermark" onerror="this.style.display='none'">
+      <img src="assets/LogoM3.jpg" alt="" class="receipt-watermark" onerror="this.style.display='none'">
       <div class="receipt-content">
         <div class="receipt-header">
           <div>
@@ -407,20 +407,17 @@ async function downloadReceipt(p) {
   const fileName = `${recNum}.jpg`;
   if (btn) { btn.disabled = true; btn.textContent = '⬇ Descargando...'; }
   try {
-    const url = p.receiptUrl || p.receipt_url || null;
-    if (url) {
-      await downloadUrlAsFile(url, fileName);
-    } else {
-      const blob = await generateReceiptImageBlob(p);
-      downloadBlob(blob, fileName);
-      // Sube en segundo plano para que la próxima vez no haya que regenerarlo
-      uploadReceiptImage(p, blob)
-        .then(newUrl => {
-          window.SUPABASE.update('payments', p.id, { receipt_url: newUrl }).catch(()=>{});
-          p.receiptUrl = newUrl; p.receipt_url = newUrl;
-        })
-        .catch(e => console.warn('No se pudo guardar el recibo en Storage', e));
-    }
+    // Siempre se regenera (no se reusa receipt_url cacheado): si el recibo ya
+    // se había generado antes con un template viejo, descargar la URL cacheada
+    // serviría una imagen desactualizada (p.ej. sin la marca de agua).
+    const blob = await generateReceiptImageBlob(p);
+    downloadBlob(blob, fileName);
+    uploadReceiptImage(p, blob)
+      .then(newUrl => {
+        window.SUPABASE.update('payments', p.id, { receipt_url: newUrl }).catch(()=>{});
+        p.receiptUrl = newUrl; p.receipt_url = newUrl;
+      })
+      .catch(e => console.warn('No se pudo guardar el recibo en Storage', e));
   } catch (e) {
     console.error('No se pudo descargar el recibo', e);
     showToast('No se pudo generar el recibo', 'error');
@@ -440,6 +437,24 @@ function waitForImages(container) {
   })));
 }
 
+/* Convierte el logo a data URL una sola vez (se reusa en cada recibo).
+   html2canvas es poco confiable con <img src> remotos/SVG; incrustar el
+   raster como data: URI elimina por completo la dependencia de red. */
+let __logoDataUrlPromise = null;
+function getLogoDataUrl() {
+  if (!__logoDataUrlPromise) {
+    __logoDataUrlPromise = fetch('assets/LogoM3.jpg')
+      .then(res => res.blob())
+      .then(blob => new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload  = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      }));
+  }
+  return __logoDataUrlPromise;
+}
+
 /* Renderiza el recibo a una imagen JPEG comprimida (peso mínimo) */
 async function generateReceiptImageBlob(p) {
   const container = document.createElement('div');
@@ -451,8 +466,13 @@ async function generateReceiptImageBlob(p) {
   container.innerHTML = buildReceiptHTML(p);
   document.body.appendChild(container);
   try {
+    const watermark = container.querySelector('.receipt-watermark');
+    if (watermark) {
+      try { watermark.src = await getLogoDataUrl(); }
+      catch(e) { console.warn('No se pudo incrustar la marca de agua', e); }
+    }
     await waitForImages(container);
-    const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
+    const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true });
     return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
   } finally {
     container.remove();

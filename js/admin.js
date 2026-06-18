@@ -480,9 +480,9 @@ function openDeptoFolder(depto) {
 
 /* ── DOWNLOAD & AUTO-CLEANUP ────────────────────────────────── */
 const PAYMENTS_CSV_COLUMNS = [
-  'id','resident_id','resident_name','depto','month','amount','status','type',
-  'description','category','reference','notes','sent_date','payment_date',
-  'approved_date','receipt_num','voucher_url','receipt_url','created_at'
+  'resident_name','depto','month','amount','status','type',
+  'description','category','sent_date','payment_date',
+  'approved_date','receipt_num'
 ];
 
 function csvEscape(v) {
@@ -520,14 +520,13 @@ async function downloadAndCleanup() {
     for (const p of toArchive) {
       csvLines.push(PAYMENTS_CSV_COLUMNS.map(col => csvEscape(p[col])).join(','));
     }
-    root.file('payments.csv', csvLines.join('\n'));
+    root.file('ReporteMensual.csv', csvLines.join('\n'));
 
     for (const p of toArchive) {
       const depto       = p.depto || 'SIN-DEPTO';
       const deptoFolder = root.folder(depto);
       const recNum      = p.receiptNum||p.receipt_num || `pago-${p.id}`;
       const voucherUrl  = p.voucherUrl||p.voucher_url || null;
-      const receiptUrl  = p.receiptUrl||p.receipt_url || null;
 
       if (voucherUrl) {
         try {
@@ -536,10 +535,10 @@ async function downloadAndCleanup() {
         } catch(e) { console.warn('No se pudo descargar comprobante para el ZIP', p.id, e); }
       }
       try {
-        const blob = receiptUrl
-          ? await (await fetch(receiptUrl)).blob()
-          : await generateReceiptImageBlob(p);
-        deptoFolder.file(`${recNum}-recibo.${receiptUrl ? extFromUrl(receiptUrl,'jpg') : 'jpg'}`, blob);
+        // Siempre se regenera en lugar de reusar receipt_url cacheado, para
+        // no archivar una imagen vieja generada con un template desactualizado.
+        const blob = await generateReceiptImageBlob(p);
+        deptoFolder.file(`${recNum}-recibo.jpg`, blob);
       } catch(e) { console.warn('No se pudo obtener el recibo para el ZIP', p.id, e); }
     }
 
