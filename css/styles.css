@@ -351,9 +351,20 @@ table tr:hover td { background: var(--gold-light); }
 
 /* ── RECEIPT / PDF ─────────────────────────────────────────── */
 .receipt {
+  position: relative; overflow: hidden;
   background: var(--white); border: 2px solid var(--navy);
   border-radius: var(--r-lg); padding: 2rem; max-width: 480px;
 }
+.receipt-watermark {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  width: 88%; height: 88%;
+  object-fit: contain;
+  opacity: 0.14;
+  z-index: 0;
+  pointer-events: none;
+}
+.receipt-content { position: relative; z-index: 1; }
 .receipt-header {
   display: flex; justify-content: space-between; align-items: flex-start;
   margin-bottom: 1.5rem; padding-bottom: 1rem;

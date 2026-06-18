@@ -319,6 +319,18 @@ async function rejectPayment(id) {
   renderPayments(); showToast('Comprobante rechazado','error'); updatePendingCounts();
 }
 
+/* ── Helpers de storage compartidos ──────────────────────────── */
+function storagePathFromUrl(url, marker) {
+  const idx = url.indexOf(marker);
+  if (idx === -1) return null;
+  return decodeURIComponent(url.slice(idx + marker.length));
+}
+function extFromUrl(url, fallback) {
+  const clean = (url||'').split('?')[0];
+  const ext = clean.split('.').pop();
+  return (ext && ext.length <= 4 && ext !== clean) ? ext : fallback;
+}
+
 /* ── DELETE PAYMENT (comprobante + recibo + ingreso vinculado) ── */
 async function deletePayment(id, folderDepto) {
   const p = DB.payments.find(p=>p.id===id);
@@ -331,10 +343,8 @@ async function deletePayment(id, folderDepto) {
 
   try {
     if (client && voucherUrl) {
-      const marker = '/comprobantes/';
-      const idx = voucherUrl.indexOf(marker);
-      if (idx !== -1) {
-        const path = decodeURIComponent(voucherUrl.slice(idx + marker.length));
+      const path = storagePathFromUrl(voucherUrl, '/comprobantes/');
+      if (path) {
         const { data: rmData, error: rmError } = await client.storage.from('comprobantes').remove([path]);
         console.info('Eliminar comprobante storage', { path, rmData, rmError });
         if (rmError) throw new Error('No se pudo eliminar el comprobante del storage (ruta: '+path+'): '+(rmError.message||rmError));
@@ -342,10 +352,8 @@ async function deletePayment(id, folderDepto) {
       }
     }
     if (client && receiptUrl) {
-      const marker = '/recibos/';
-      const idx = receiptUrl.indexOf(marker);
-      if (idx !== -1) {
-        const path = decodeURIComponent(receiptUrl.slice(idx + marker.length));
+      const path = storagePathFromUrl(receiptUrl, '/recibos/');
+      if (path) {
         const { data: rmData, error: rmError } = await client.storage.from('recibos').remove([path]);
         console.info('Eliminar recibo storage', { path, rmData, rmError });
         if (rmError) throw new Error('No se pudo eliminar el recibo del storage (ruta: '+path+'): '+(rmError.message||rmError));
@@ -471,47 +479,127 @@ function openDeptoFolder(depto) {
 }
 
 /* ── DOWNLOAD & AUTO-CLEANUP ────────────────────────────────── */
+const PAYMENTS_CSV_COLUMNS = [
+  'id','resident_id','resident_name','depto','month','amount','status','type',
+  'description','category','reference','notes','sent_date','payment_date',
+  'approved_date','receipt_num','voucher_url','receipt_url','created_at'
+];
+
+function csvEscape(v) {
+  return '"' + String(v ?? '').replace(/"/g,'""') + '"';
+}
+
 async function downloadAndCleanup() {
-  const today = new Date();
+  if (typeof JSZip === 'undefined') {
+    showToast('No se pudo cargar la librería de ZIP (JSZip)','error');
+    return;
+  }
 
-  // Export CSV of payments
-  const headers = 'Recibo,Depto,Residente,Mes,Monto,Fecha Pago,Fecha Aprobación,Comprobante';
-  const rows = DB.payments
-    .filter(p=>p.status==='approved'&&(p.residentId||p.resident_id))
-    .map(p=>[
-      p.receiptNum||p.receipt_num||'',
-      p.depto||'',
-      p.residentName||p.resident_name||'',
-      p.month||'',
-      p.amount,
-      p.paymentDate||p.payment_date||'',
-      p.approvedDate||p.approved_date||'',
-      p.voucherUrl||p.voucher_url||''
-    ].join(','));
-  const csv  = [headers,...rows].join('\n');
-  const blob = new Blob([csv],{type:'text/csv'});
-  const a    = document.createElement('a');
-  a.href     = URL.createObjectURL(blob);
-  a.download = `Pagos-${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}.csv`;
-  a.click();
+  const today             = new Date();
+  const currMonthStartStr = new Date(today.getFullYear(), today.getMonth(),     1).toISOString().split('T')[0];
+  const prevMonthStart    = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+  const prevMonthStartStr = prevMonthStart.toISOString().split('T')[0];
 
-  // Auto-cleanup: remove payments from previous months from Supabase
-  const prevMonthThreshold = new Date(today.getFullYear(), today.getMonth() - 1, 1).toISOString().split('T')[0];
+  // Comprobantes aprobados que caen exactamente en el mes anterior
+  const toArchive = DB.payments.filter(p => {
+    if (!(p.residentId||p.resident_id)) return false;
+    if (p.status !== 'approved') return false;
+    const d = p.approvedDate||p.approved_date||'';
+    return d && d >= prevMonthStartStr && d < currMonthStartStr;
+  });
+
+  if (toArchive.length === 0) {
+    showToast('No hay comprobantes aprobados del mes anterior para archivar','error');
+    return;
+  }
+
+  const monthLabel = prevMonthStart
+    .toLocaleDateString('es-MX', { month:'long', year:'numeric' })
+    .replace(/^./, c => c.toUpperCase());
+  const folderName = `Reporte-${monthLabel}`.replace(/\s+/g,'-');
+
+  showToast('Generando ZIP, esto puede tardar unos segundos…');
+
   try {
-    const client = window.SUPABASE?.client?.();
-    if (client) {
-      await client.from('payments').delete()
-        .lt('approved_date', prevMonthThreshold)
-        .eq('status','approved')
-        .not('resident_id','is',null);
-      DB.payments = DB.payments.filter(p => {
-        if (!(p.residentId||p.resident_id)) return true;
-        const d = p.approvedDate||p.approved_date||'';
-        return !d || d >= prevMonthThreshold || p.status !== 'approved';
-      });
-      showToast('✓ Descarga completada — comprobantes anteriores eliminados');
+    const zip  = new JSZip();
+    const root = zip.folder(folderName);
+
+    const csvLines = [PAYMENTS_CSV_COLUMNS.join(',')];
+    for (const p of toArchive) {
+      csvLines.push(PAYMENTS_CSV_COLUMNS.map(col => csvEscape(p[col])).join(','));
     }
-  } catch(e) { console.warn('Cleanup failed',e); showToast('Descarga completada (limpieza manual requerida)','error'); }
+    root.file('payments.csv', csvLines.join('\n'));
+
+    for (const p of toArchive) {
+      const depto       = p.depto || 'SIN-DEPTO';
+      const deptoFolder = root.folder(depto);
+      const recNum      = p.receiptNum||p.receipt_num || `pago-${p.id}`;
+      const voucherUrl  = p.voucherUrl||p.voucher_url || null;
+      const receiptUrl  = p.receiptUrl||p.receipt_url || null;
+
+      if (voucherUrl) {
+        try {
+          const blob = await (await fetch(voucherUrl)).blob();
+          deptoFolder.file(`${recNum}-comprobante.${extFromUrl(voucherUrl,'jpg')}`, blob);
+        } catch(e) { console.warn('No se pudo descargar comprobante para el ZIP', p.id, e); }
+      }
+      try {
+        const blob = receiptUrl
+          ? await (await fetch(receiptUrl)).blob()
+          : await generateReceiptImageBlob(p);
+        deptoFolder.file(`${recNum}-recibo.${receiptUrl ? extFromUrl(receiptUrl,'jpg') : 'jpg'}`, blob);
+      } catch(e) { console.warn('No se pudo obtener el recibo para el ZIP', p.id, e); }
+    }
+
+    const zipBlob = await zip.generateAsync({ type:'blob' });
+    downloadBlob(zipBlob, `${folderName}.zip`);
+  } catch(e) {
+    console.error('Error generando el ZIP', e);
+    showToast('Error al generar el ZIP: '+(e?.message||e),'error');
+    return;
+  }
+
+  // Limpieza real: storage (comprobantes + recibos) y filas de payments
+  const client = window.SUPABASE?.client?.();
+  const archivedIds = [];
+  for (const p of toArchive) {
+    try {
+      const voucherUrl = p.voucherUrl||p.voucher_url || null;
+      const receiptUrl = p.receiptUrl||p.receipt_url || null;
+      if (client && voucherUrl) {
+        const path = storagePathFromUrl(voucherUrl, '/comprobantes/');
+        if (path) {
+          const { data, error } = await client.storage.from('comprobantes').remove([path]);
+          if (error) throw new Error('Storage comprobantes: '+(error.message||error));
+          if (!data || data.length === 0) throw new Error('Comprobante no encontrado en storage (ruta: '+path+')');
+        }
+      }
+      if (client && receiptUrl) {
+        const path = storagePathFromUrl(receiptUrl, '/recibos/');
+        if (path) {
+          const { data, error } = await client.storage.from('recibos').remove([path]);
+          if (error) throw new Error('Storage recibos: '+(error.message||error));
+          if (!data || data.length === 0) throw new Error('Recibo no encontrado en storage (ruta: '+path+')');
+        }
+      }
+      await window.SUPABASE.remove('payments', p.id);
+      archivedIds.push(p.id);
+    } catch(e) {
+      console.error('No se pudo archivar/eliminar el pago', p.id, e);
+    }
+  }
+
+  DB.payments = DB.payments.filter(p => !archivedIds.includes(p.id));
+  renderVouchers();
+  if (typeof renderPayments === 'function') renderPayments();
+  if (typeof renderFinances === 'function') renderFinances();
+  updatePendingCounts();
+
+  if (archivedIds.length === toArchive.length) {
+    showToast(`✓ ZIP descargado — ${archivedIds.length} comprobantes archivados y eliminados`);
+  } else {
+    showToast(`ZIP descargado — ${archivedIds.length} de ${toArchive.length} eliminados (revisa la consola)`,'error');
+  }
 }
 
 /* ── FINANCES (ledger completo: pagos de residentes + movimientos manuales) ── */

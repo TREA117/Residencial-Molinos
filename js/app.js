@@ -344,26 +344,29 @@ function buildReceiptHTML(p) {
 
   return `
     <div class="receipt">
-      <div class="receipt-header">
-        <div>
-          <img src="assets/LogoM3.svg" alt="Real Molinos 3" class="receipt-logo-img" onerror="this.style.display='none'">
-          <div class="receipt-logo">Real Molinos 3</div>
-          <div style="font-size:10px;color:var(--mist)">Privada</div>
+      <img src="assets/LogoM3.svg" alt="" class="receipt-watermark" onerror="this.style.display='none'">
+      <div class="receipt-content">
+        <div class="receipt-header">
+          <div>
+            <img src="assets/LogoM3.svg" alt="Real Molinos 3" class="receipt-logo-img" onerror="this.style.display='none'">
+            <div class="receipt-logo">Real Molinos 3</div>
+            <div style="font-size:10px;color:var(--mist)">Privada</div>
+          </div>
+          <div class="receipt-num"><strong style="color:var(--navy)">${recNum}</strong><br>${fmtDate(approvedDate)}</div>
         </div>
-        <div class="receipt-num"><strong style="color:var(--navy)">${recNum}</strong><br>${fmtDate(approvedDate)}</div>
-      </div>
-      <div class="receipt-row"><span class="key">Residente</span><span>${resName}</span></div>
-      <div class="receipt-row"><span class="key">Departamento</span><span>${p.depto||'—'}</span></div>
-      <div class="receipt-row"><span class="key">Concepto</span><span>Cuota de mantenimiento mensual</span></div>
-      <div class="receipt-row"><span class="key">Período</span><span>${p.month||'—'}</span></div>
-      <div class="receipt-row"><span class="key">Fecha de pago</span><span>${p.paymentDate||p.payment_date ? fmtDate(p.paymentDate||p.payment_date) : fmtDate(approvedDate)}</span></div>
-      <div class="receipt-row"><span class="key">Fecha aprobación</span><span>${fmtDate(approvedDate)}</span></div>
-      <div class="receipt-row"><span class="key">Referencia</span><span>${recNum}</span></div>
-      <div class="receipt-total"><span>Total pagado</span><span>${fmt(p.amount)}</span></div>
-      <div class="receipt-sig">
-        <div class="receipt-sig-label">Firma de administración</div>
-        <div class="sig-box"><span class="sig-text">Administración RM3</span></div>
-        <div style="font-size:10px;color:var(--mist);margin-top:4px">Real Molinos 3 Privada — Documento oficial de pago</div>
+        <div class="receipt-row"><span class="key">Residente</span><span>${resName}</span></div>
+        <div class="receipt-row"><span class="key">Departamento</span><span>${p.depto||'—'}</span></div>
+        <div class="receipt-row"><span class="key">Concepto</span><span>Cuota de mantenimiento mensual</span></div>
+        <div class="receipt-row"><span class="key">Período</span><span>${p.month||'—'}</span></div>
+        <div class="receipt-row"><span class="key">Fecha de pago</span><span>${p.paymentDate||p.payment_date ? fmtDate(p.paymentDate||p.payment_date) : fmtDate(approvedDate)}</span></div>
+        <div class="receipt-row"><span class="key">Fecha aprobación</span><span>${fmtDate(approvedDate)}</span></div>
+        <div class="receipt-row"><span class="key">Referencia</span><span>${recNum}</span></div>
+        <div class="receipt-total"><span>Total pagado</span><span>${fmt(p.amount)}</span></div>
+        <div class="receipt-sig">
+          <div class="receipt-sig-label">Firma de administración</div>
+          <div class="sig-box"><span class="sig-text">Administración RM3</span></div>
+          <div style="font-size:10px;color:var(--mist);margin-top:4px">Real Molinos 3 Privada — Documento oficial de pago</div>
+        </div>
       </div>
     </div>`;
 }
