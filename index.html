@@ -366,7 +366,8 @@
     <div class="modal-head"><span class="modal-title">Recibo de pago</span><button class="modal-close" onclick="closeModal('modalReceipt')">✕</button></div>
     <div class="modal-body"><div id="receiptContent"></div></div>
     <div class="modal-foot">
-      <button class="btn btn-secondary" onclick="printReceipt()">🖨 Imprimir / PDF</button>
+      <button class="btn btn-secondary" id="btnDownloadReceipt">⬇ Descargar PDF</button>
+      <button class="btn btn-secondary" onclick="printReceipt()">🖨 Imprimir</button>
       <button class="btn btn-primary"   onclick="closeModal('modalReceipt')">Cerrar</button>
     </div>
   </div>
@@ -541,6 +542,8 @@
     key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF4anV6dGN0YnB3eW1tc2tkeXF3Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEyNjg5NjAsImV4cCI6MjA5Njg0NDk2MH0.PZFOWDjcpeohOm9yXldpH3QzaQs2g0rIqx07_UHcwhs'
   };
 </script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
 <script src="js/supabase.js"></script>
 <script src="js/db.js"></script>

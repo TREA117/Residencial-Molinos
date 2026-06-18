@@ -337,14 +337,12 @@ function renderContacts() {
 }
 
 /* ── RECEIPT VIEWER & PDF ──────────────────────────────────── */
-function showReceipt(id) {
-  const p = DB.payments.find(p => p.id === id);
-  if (!p || !(p.receiptNum || p.receipt_num)) return;
+function buildReceiptHTML(p) {
   const recNum       = p.receiptNum || p.receipt_num;
   const approvedDate = p.approvedDate || p.approved_date || new Date().toISOString().split('T')[0];
   const resName      = p.residentName || p.resident_name || '—';
 
-  document.getElementById('receiptContent').innerHTML = `
+  return `
     <div class="receipt">
       <div class="receipt-header">
         <div>
@@ -368,7 +366,85 @@ function showReceipt(id) {
         <div style="font-size:10px;color:var(--mist);margin-top:4px">Real Molinos 3 Privada — Documento oficial de pago</div>
       </div>
     </div>`;
+}
+
+function showReceipt(id) {
+  const p = DB.payments.find(p => p.id === id);
+  if (!p || !(p.receiptNum || p.receipt_num)) return;
+  document.getElementById('receiptContent').innerHTML = buildReceiptHTML(p);
+  updateReceiptDownloadButton(p);
   openModal('modalReceipt');
+}
+
+function updateReceiptDownloadButton(p) {
+  const btn = document.getElementById('btnDownloadReceipt');
+  if (!btn) return;
+  const url = p.receiptUrl || p.receipt_url || null;
+  if (url) {
+    btn.textContent = '⬇ Descargar PDF';
+    btn.disabled = false;
+    btn.onclick = () => window.open(url, '_blank');
+  } else {
+    btn.textContent = '⬇ Generando PDF...';
+    btn.disabled = true;
+    btn.onclick = null;
+    generateMissingReceiptPDF(p);
+  }
+}
+
+async function generateMissingReceiptPDF(p) {
+  const btn = document.getElementById('btnDownloadReceipt');
+  try {
+    const url = await uploadReceiptPDF(p);
+    await window.SUPABASE.update('payments', p.id, { receipt_url: url });
+    p.receiptUrl = url; p.receipt_url = url;
+    if (btn) {
+      btn.textContent = '⬇ Descargar PDF';
+      btn.disabled = false;
+      btn.onclick = () => window.open(url, '_blank');
+    }
+  } catch (e) {
+    console.error('No se pudo generar el PDF del recibo', e);
+    if (btn) { btn.textContent = '⬇ No disponible'; btn.disabled = true; }
+  }
+}
+
+/* Genera el PDF del recibo (html2canvas + jsPDF) y lo sube al bucket 'recibos' */
+async function generateReceiptPDFBlob(p) {
+  const container = document.createElement('div');
+  container.style.position = 'fixed';
+  container.style.left     = '-9999px';
+  container.style.top      = '0';
+  container.style.width    = '520px';
+  container.style.background = '#fff';
+  container.innerHTML = buildReceiptHTML(p);
+  document.body.appendChild(container);
+  try {
+    const canvas    = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff' });
+    const imgData   = canvas.toDataURL('image/png');
+    const { jsPDF } = window.jspdf;
+    const pdfWidth  = 210; // mm (A4)
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    const pdf = new jsPDF({ unit: 'mm', format: [pdfWidth, pdfHeight] });
+    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+    return pdf.output('blob');
+  } finally {
+    container.remove();
+  }
+}
+
+async function uploadReceiptPDF(p) {
+  const client = window.SUPABASE?.client?.();
+  if (!client) throw new Error('Sin conexión con Supabase');
+  const recNum = p.receiptNum || p.receipt_num;
+  if (!recNum) throw new Error('El pago no tiene número de recibo');
+  const blob     = await generateReceiptPDFBlob(p);
+  const fileName = `${p.depto||'SIN-DEPTO'}/${recNum}.pdf`;
+  const { error: uploadError } = await client.storage
+    .from('recibos').upload(fileName, blob, { cacheControl:'3600', upsert:true, contentType:'application/pdf' });
+  if (uploadError) throw uploadError;
+  const { data: { publicUrl } } = client.storage.from('recibos').getPublicUrl(fileName);
+  return publicUrl;
 }
 
 function printReceipt() {

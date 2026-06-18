@@ -272,7 +272,7 @@ async function approvePayment(id) {
   }
 
   renderPayments();
-  showReceipt(id);
+  showReceipt(id); // también genera y sube el PDF del recibo a Supabase Storage (ver updateReceiptDownloadButton)
   updatePendingCounts();
   showToast('✓ Pago aprobado — Recibo '+receiptNum+' generado');
 }

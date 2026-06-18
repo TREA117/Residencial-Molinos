@@ -20,6 +20,7 @@ function normalizePayment(p) {
     sentDate:     p.sentDate     || p.sent_date     || '',
     approvedDate: p.approvedDate || p.approved_date || null,
     receiptNum:   p.receiptNum   || p.receipt_num   || null,
+    receiptUrl:   p.receiptUrl   || p.receipt_url   || null,
     voucherUrl:   p.voucherUrl   || p.voucher_url   || null,
   };
 }
