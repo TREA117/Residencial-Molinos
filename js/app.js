@@ -379,38 +379,47 @@ function showReceipt(id) {
 function updateReceiptDownloadButton(p) {
   const btn = document.getElementById('btnDownloadReceipt');
   if (!btn) return;
-  const url = p.receiptUrl || p.receipt_url || null;
-  if (url) {
-    btn.textContent = '⬇ Descargar PDF';
-    btn.disabled = false;
-    btn.onclick = () => window.open(url, '_blank');
-  } else {
-    btn.textContent = '⬇ Generando PDF...';
-    btn.disabled = true;
-    btn.onclick = null;
-    generateMissingReceiptPDF(p);
-  }
+  btn.textContent = '⬇ Descargar';
+  btn.disabled = false;
+  btn.onclick = () => downloadReceipt(p);
 }
 
-async function generateMissingReceiptPDF(p) {
+async function downloadReceipt(p) {
   const btn = document.getElementById('btnDownloadReceipt');
+  const recNum = p.receiptNum || p.receipt_num || 'recibo';
+  const fileName = `${recNum}.jpg`;
+  if (btn) { btn.disabled = true; btn.textContent = '⬇ Descargando...'; }
   try {
-    const url = await uploadReceiptPDF(p);
-    await window.SUPABASE.update('payments', p.id, { receipt_url: url });
-    p.receiptUrl = url; p.receipt_url = url;
-    if (btn) {
-      btn.textContent = '⬇ Descargar PDF';
-      btn.disabled = false;
-      btn.onclick = () => window.open(url, '_blank');
+    const url = p.receiptUrl || p.receipt_url || null;
+    let blob;
+    if (url) {
+      const res = await fetch(url);
+      blob = await res.blob();
+    } else {
+      blob = await generateReceiptImageBlob(p);
+      // Sube en segundo plano para que la próxima vez no haya que regenerarlo
+      uploadReceiptImage(p, blob)
+        .then(newUrl => {
+          window.SUPABASE.update('payments', p.id, { receipt_url: newUrl }).catch(()=>{});
+          p.receiptUrl = newUrl; p.receipt_url = newUrl;
+        })
+        .catch(e => console.warn('No se pudo guardar el recibo en Storage', e));
     }
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl; a.download = fileName;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(blobUrl);
   } catch (e) {
-    console.error('No se pudo generar el PDF del recibo', e);
-    if (btn) { btn.textContent = '⬇ No disponible'; btn.disabled = true; }
+    console.error('No se pudo descargar el recibo', e);
+    showToast('No se pudo generar el recibo', 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '⬇ Descargar'; }
   }
 }
 
-/* Genera el PDF del recibo (html2canvas + jsPDF) y lo sube al bucket 'recibos' */
-async function generateReceiptPDFBlob(p) {
+/* Renderiza el recibo a una imagen JPEG comprimida (peso mínimo) */
+async function generateReceiptImageBlob(p) {
   const container = document.createElement('div');
   container.style.position = 'fixed';
   container.style.left     = '-9999px';
@@ -420,51 +429,41 @@ async function generateReceiptPDFBlob(p) {
   container.innerHTML = buildReceiptHTML(p);
   document.body.appendChild(container);
   try {
-    const canvas    = await html2canvas(container, { scale: 2, backgroundColor: '#ffffff' });
-    const imgData   = canvas.toDataURL('image/png');
-    const { jsPDF } = window.jspdf;
-    const pdfWidth  = 210; // mm (A4)
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    const pdf = new jsPDF({ unit: 'mm', format: [pdfWidth, pdfHeight] });
-    pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-    return pdf.output('blob');
+    const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff' });
+    return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
   } finally {
     container.remove();
   }
 }
 
-async function uploadReceiptPDF(p) {
+async function uploadReceiptImage(p, blob) {
   const client = window.SUPABASE?.client?.();
   if (!client) throw new Error('Sin conexión con Supabase');
   const recNum = p.receiptNum || p.receipt_num;
   if (!recNum) throw new Error('El pago no tiene número de recibo');
-  const blob     = await generateReceiptPDFBlob(p);
-  const fileName = `${p.depto||'SIN-DEPTO'}/${recNum}.pdf`;
+  const imgBlob  = blob || await generateReceiptImageBlob(p);
+  const fileName = `${p.depto||'SIN-DEPTO'}/${recNum}.jpg`;
   const { error: uploadError } = await client.storage
-    .from('recibos').upload(fileName, blob, { cacheControl:'3600', upsert:true, contentType:'application/pdf' });
+    .from('recibos').upload(fileName, imgBlob, { cacheControl:'3600', upsert:true, contentType:'image/jpeg' });
   if (uploadError) throw uploadError;
   const { data: { publicUrl } } = client.storage.from('recibos').getPublicUrl(fileName);
   return publicUrl;
 }
 
-function printReceipt() {
-  const style = document.createElement('style');
-  style.id = 'print-style';
-  style.innerHTML = `@media print {
-    body > *:not(#modalReceipt) { display:none !important; }
-    #modalReceipt { position:static !important; background:white !important; padding:0 !important; }
-    .modal { box-shadow:none !important; max-width:100% !important; }
-    .modal-head, .modal-foot { display:none !important; }
-    .modal-body { padding:0 !important; }
-  }`;
-  document.head.appendChild(style);
-  window.print();
-  setTimeout(() => { const s = document.getElementById('print-style'); if (s) s.remove(); }, 1000);
-}
-
 /* ── HELPERS ────────────────────────────────────────────────── */
-function openModal(id)  { document.getElementById(id)?.classList.add('open'); }
-function closeModal(id) { document.getElementById(id)?.classList.remove('open'); }
+let __modalZTop = 100;
+function openModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.zIndex = String(++__modalZTop);
+  el.classList.add('open');
+}
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.remove('open');
+  el.style.zIndex = '';
+}
 
 function showAlert(elId, msg, type) {
   const el = document.getElementById(elId);
