@@ -7,7 +7,6 @@ const DB = {
   users: [],
   residents: [],
   payments: [],
-  finances: [],
   notifications: [],
   contacts: {
     admin: {

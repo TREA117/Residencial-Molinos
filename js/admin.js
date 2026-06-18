@@ -4,12 +4,13 @@
 
 /* ── DASHBOARD ─────────────────────────────────────────────── */
 function renderDashboard() {
-  const totalIncome  = DB.finances.filter(f=>f.type==='income').reduce((s,f)=>s+Number(f.amount||0),0);
-  const totalExpense = DB.finances.filter(f=>f.type==='expense').reduce((s,f)=>s+Number(f.amount||0),0);
-  const balance      = totalIncome - totalExpense;
-  const approvedRes  = DB.residents.filter(r=>r.status==='approved').length;
-  const pendingRes   = DB.residents.filter(r=>r.status==='pending').length;
-  const pendingPay   = DB.payments.filter(p=>p.status==='pending').length;
+  const approved      = DB.payments.filter(p=>p.status==='approved');
+  const totalIncome    = approved.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
+  const totalExpense   = approved.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
+  const balance        = totalIncome - totalExpense;
+  const approvedRes    = DB.residents.filter(r=>r.status==='approved').length;
+  const pendingRes     = DB.residents.filter(r=>r.status==='pending').length;
+  const pendingPay     = DB.payments.filter(p=>p.status==='pending'&&(p.residentId||p.resident_id)).length;
 
   const area = document.getElementById('metricsArea');
   if (area) area.innerHTML = `
@@ -21,25 +22,30 @@ function renderDashboard() {
 
   renderCharts();
 
-  const all = [
-    ...DB.finances.map(f=>({date:f.date, desc:f.desc||f.description||'', type:f.type, amount:f.amount, status:'—'})),
-    ...DB.payments.map(p=>({date:p.sentDate||p.sent_date, desc:'Pago '+(p.month||'')+' — Depto '+(p.depto||''), type:'payment', amount:p.amount, status:p.status}))
-  ];
+  const all = DB.payments.map(p=>{
+    const isResident = !!(p.residentId||p.resident_id);
+    const desc = p.description || (isResident ? 'Pago '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
+    const date = p.approvedDate||p.approved_date||p.sentDate||p.sent_date;
+    const dispType = p.status==='pending' ? 'payment' : (p.status==='rejected' ? 'payment' : p.type);
+    return { date, desc, type:dispType, amount:p.amount, status:p.status };
+  });
   all.sort((a,b)=>new Date(b.date)-new Date(a.date));
   const ra = document.getElementById('recentActivity');
   if (ra) ra.innerHTML = all.slice(0,8).map(r=>`<tr>
     <td>${fmtDate(r.date)}</td><td>${r.desc}</td>
     <td><span class="badge ${r.type==='income'?'badge-income':r.type==='expense'?'badge-expense':'badge-pending'}">${r.type==='income'?'Ingreso':r.type==='expense'?'Egreso':'Pago'}</span></td>
     <td style="font-weight:500;color:${r.type==='income'?'var(--navy)':'var(--c-red)'}">${r.type==='income'?'+':'−'}${fmt(r.amount)}</td>
-    <td><span class="badge ${r.status==='approved'?'badge-approved':r.status==='pending'?'badge-pending':'badge-rejected'}">${r.status==='—'?'—':r.status==='approved'?'Aprobado':r.status==='pending'?'Pendiente':'Rechazado'}</span></td>
+    <td><span class="badge ${r.status==='approved'?'badge-approved':r.status==='pending'?'badge-pending':'badge-rejected'}">${r.status==='approved'?'Aprobado':r.status==='pending'?'Pendiente':'Rechazado'}</span></td>
   </tr>`).join('');
 }
 
 function renderCharts() {
   const months  = ['Ene','Feb','Mar','Abr','May','Jun'];
   const mKeys   = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
-  const incomes  = mKeys.map(m=>DB.finances.filter(f=>f.type==='income' &&String(f.date||'').startsWith(m)).reduce((s,f)=>s+Number(f.amount||0),0));
-  const expenses = mKeys.map(m=>DB.finances.filter(f=>f.type==='expense'&&String(f.date||'').startsWith(m)).reduce((s,f)=>s+Number(f.amount||0),0));
+  const approved = DB.payments.filter(p=>p.status==='approved');
+  const txDate   = p => p.approvedDate||p.approved_date||'';
+  const incomes  = mKeys.map(m=>approved.filter(p=>p.type==='income' &&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
+  const expenses = mKeys.map(m=>approved.filter(p=>p.type==='expense'&&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
   if (chartFlow) chartFlow.destroy();
   const ctx1 = document.getElementById('chartFlow');
   if (ctx1) chartFlow = new Chart(ctx1, {
@@ -54,7 +60,7 @@ function renderCharts() {
     }
   });
   const cats = {};
-  DB.finances.filter(f=>f.type==='expense').forEach(f=>{const k=f.cat||f.category||'Otros'; cats[k]=(cats[k]||0)+Number(f.amount||0);});
+  approved.filter(p=>p.type==='expense').forEach(p=>{const k=p.category||'Otros'; cats[k]=(cats[k]||0)+Number(p.amount||0);});
   if (chartDist) chartDist.destroy();
   const ctx2 = document.getElementById('chartDist');
   if (ctx2 && Object.keys(cats).length) chartDist = new Chart(ctx2, {
@@ -208,9 +214,10 @@ async function saveNewResident() {
 
 /* ── PAYMENTS / VOUCHERS (admin) ───────────────────────────── */
 function renderPayments() {
-  const month   = document.getElementById('filterPayMonth')?.value||'';
-  const pending = DB.payments.filter(p=>p.status==='pending');
-  const all     = DB.payments.filter(p=>p.status!=='rejected').filter(p=>!month||p.month===month);
+  const month     = document.getElementById('filterPayMonth')?.value||'';
+  const residentPays = DB.payments.filter(p=>p.residentId||p.resident_id);
+  const pending   = residentPays.filter(p=>p.status==='pending');
+  const all       = residentPays.filter(p=>p.status!=='rejected').filter(p=>!month||p.month===month);
   const ppb = document.getElementById('payPendingBadge');
   if (ppb) ppb.textContent = pending.length;
 
@@ -249,24 +256,13 @@ async function approvePayment(id) {
 
   try {
     await window.SUPABASE.update('payments', id, {
-      status:'approved', approved_date:approvedDate, receipt_num:receiptNum
-    });
-    const finRows = await window.SUPABASE.insert('finances', {
-      date:approvedDate, description:desc,
-      category:'Mantenimiento', type:'income', amount:p.amount,
-      reference:receiptNum, notes:'', cat:'Mantenimiento', ref:receiptNum
+      status:'approved', approved_date:approvedDate, receipt_num:receiptNum,
+      type:'income', description:desc, category:'Mantenimiento'
     });
     p.status = 'approved';
     p.approvedDate = approvedDate; p.approved_date = approvedDate;
     p.receiptNum = receiptNum; p.receipt_num = receiptNum;
-
-    const finRow = Array.isArray(finRows) ? finRows[0] : finRows;
-    if (finRow) {
-      finRow.desc = finRow.description;
-      finRow.cat  = finRow.category;
-      finRow.ref  = finRow.reference;
-      DB.finances.push(finRow);
-    }
+    p.type = 'income'; p.description = desc; p.category = 'Mantenimiento';
   } catch(e) {
     console.error('Supabase approve payment failed', e);
     showToast('Error al aprobar el pago: '+(e?.message||e), 'error');
@@ -327,12 +323,11 @@ async function rejectPayment(id) {
 async function deletePayment(id, folderDepto) {
   const p = DB.payments.find(p=>p.id===id);
   if (!p) return;
-  if (!confirm('¿Eliminar este comprobante de forma permanente? Se borrará el comprobante, el recibo y, si aplica, el ingreso registrado en Finanzas. Esta acción no se puede deshacer.')) return;
+  if (!confirm('¿Eliminar este registro de forma permanente? Se borrará el comprobante y el recibo (si aplica) del storage, y la fila de la tabla payments. Esta acción no se puede deshacer.')) return;
 
   const client      = window.SUPABASE?.client?.();
   const voucherUrl  = p.voucherUrl || p.voucher_url || null;
   const receiptUrl  = p.receiptUrl || p.receipt_url || null;
-  const receiptNum  = p.receiptNum || p.receipt_num || null;
 
   try {
     if (client && voucherUrl) {
@@ -357,11 +352,6 @@ async function deletePayment(id, folderDepto) {
         if (!rmData || rmData.length === 0) throw new Error('El recibo no se encontró en el storage (ruta: '+path+'). Verifica el bucket "recibos".');
       }
     }
-    if (client && receiptNum) {
-      const { error: finError } = await client.from('finances').delete().eq('reference', receiptNum);
-      if (finError) throw new Error('No se pudo eliminar el ingreso vinculado en finanzas: '+(finError.message||finError));
-    }
-
     await window.SUPABASE.remove('payments', id);
   } catch(e) {
     console.error('Supabase delete payment failed', e);
@@ -370,7 +360,6 @@ async function deletePayment(id, folderDepto) {
   }
 
   DB.payments  = DB.payments.filter(p=>p.id!==id);
-  if (receiptNum) DB.finances = DB.finances.filter(f=>(f.reference||f.ref)!==receiptNum);
 
   renderPayments();
   if (typeof renderVouchers === 'function') renderVouchers();
@@ -411,9 +400,9 @@ function renderVouchers() {
   const area = document.getElementById('vouchersArea');
   if (!area) return;
 
-  // Group by depto
+  // Group by depto (solo comprobantes ligados a un residente)
   const byDepto = {};
-  DB.payments.forEach(p => {
+  DB.payments.filter(p=>p.residentId||p.resident_id).forEach(p => {
     const d = p.depto||'SIN-DEPTO';
     if (!byDepto[d]) byDepto[d] = [];
     byDepto[d].push(p);
@@ -440,7 +429,7 @@ function renderVouchers() {
 }
 
 function openDeptoFolder(depto) {
-  const pays = DB.payments.filter(p=>(p.depto||'SIN-DEPTO')===depto);
+  const pays = DB.payments.filter(p=>(p.residentId||p.resident_id)&&(p.depto||'SIN-DEPTO')===depto);
   document.getElementById('folderTitle').textContent = 'Depto ' + depto;
   document.getElementById('folderBody').innerHTML = `
     <table style="width:100%">
@@ -477,7 +466,7 @@ async function downloadAndCleanup() {
   // Export CSV of payments
   const headers = 'Recibo,Depto,Residente,Mes,Monto,Fecha Pago,Fecha Aprobación,Comprobante';
   const rows = DB.payments
-    .filter(p=>p.status==='approved')
+    .filter(p=>p.status==='approved'&&(p.residentId||p.resident_id))
     .map(p=>[
       p.receiptNum||p.receipt_num||'',
       p.depto||'',
@@ -502,8 +491,10 @@ async function downloadAndCleanup() {
     if (client) {
       await client.from('payments').delete()
         .lt('approved_date', prevMonthThreshold)
-        .eq('status','approved');
+        .eq('status','approved')
+        .not('resident_id','is',null);
       DB.payments = DB.payments.filter(p => {
+        if (!(p.residentId||p.resident_id)) return true;
         const d = p.approvedDate||p.approved_date||'';
         return !d || d >= prevMonthThreshold || p.status !== 'approved';
       });
@@ -512,31 +503,38 @@ async function downloadAndCleanup() {
   } catch(e) { console.warn('Cleanup failed',e); showToast('Descarga completada (limpieza manual requerida)','error'); }
 }
 
-/* ── FINANCES ──────────────────────────────────────────────── */
+/* ── FINANCES (ledger completo: pagos de residentes + movimientos manuales) ── */
 function renderFinances() {
   const type = document.getElementById('filterFinType')?.value||'';
   const cat  = document.getElementById('filterFinCat')?.value||'';
-  const filtered = DB.finances.filter(f=>(!type||f.type===type)&&(!cat||(f.cat||f.category||'')===cat));
-  const totalIn  = filtered.filter(f=>f.type==='income').reduce((s,f)=>s+Number(f.amount||0),0);
-  const totalEx  = filtered.filter(f=>f.type==='expense').reduce((s,f)=>s+Number(f.amount||0),0);
+  const ledger = DB.payments.filter(p=>p.status==='approved');
+  const filtered = ledger.filter(p=>(!type||p.type===type)&&(!cat||(p.category||'')===cat));
+  const totalIn  = filtered.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
+  const totalEx  = filtered.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
   const fm = document.getElementById('finMetrics');
   if (fm) fm.innerHTML = `
     <div class="metric"><div class="metric-label">Ingresos filtrados</div><div class="metric-value" style="color:var(--navy)">${fmt(totalIn)}</div></div>
     <div class="metric"><div class="metric-label">Egresos filtrados</div><div class="metric-value" style="color:var(--c-red)">${fmt(totalEx)}</div></div>
     <div class="metric"><div class="metric-label">Balance</div><div class="metric-value" style="color:${totalIn-totalEx>=0?'var(--navy)':'var(--c-red)'}">${fmt(totalIn-totalEx)}</div></div>`;
 
-  const cats = [...new Set(DB.finances.map(f=>f.cat||f.category||'Otros').filter(Boolean))];
+  const cats = [...new Set(ledger.map(p=>p.category||'Otros').filter(Boolean))];
   const cs = document.getElementById('filterFinCat');
   if (cs&&cs.children.length<=1) cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;cs.appendChild(o);});
 
+  const txDate = p => p.approvedDate||p.approved_date||p.paymentDate||p.payment_date;
   const tf = document.getElementById('tblFinances');
-  if (tf) tf.innerHTML = filtered.sort((a,b)=>new Date(b.date)-new Date(a.date)).map(f=>`<tr>
-    <td>${fmtDate(f.date)}</td><td>${f.desc||f.description||'—'}</td><td>${f.cat||f.category||'—'}</td>
-    <td><span class="badge ${f.type==='income'?'badge-income':'badge-expense'}">${f.type==='income'?'Ingreso':'Egreso'}</span></td>
-    <td style="font-weight:500;color:${f.type==='income'?'var(--navy)':'var(--c-red)'}">${f.type==='income'?'+':'−'}${fmt(f.amount)}</td>
-    <td style="color:var(--mist)">${f.ref||f.reference||'—'}</td>
-    <td><button class="btn btn-danger btn-sm" onclick="deleteTransaction(${f.id})">Eliminar</button></td>
-  </tr>`).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--mist);padding:1.5rem">Sin transacciones</td></tr>';
+  if (tf) tf.innerHTML = filtered.sort((a,b)=>new Date(txDate(b))-new Date(txDate(a))).map(p=>{
+    const isResident = !!(p.residentId||p.resident_id);
+    const desc = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
+    const cat  = p.category || (isResident ? 'Mantenimiento' : '—');
+    const ref  = p.reference || p.receiptNum || p.receipt_num || '—';
+    return `<tr>
+    <td>${fmtDate(txDate(p))}</td><td>${desc}</td><td>${cat}</td>
+    <td><span class="badge ${p.type==='income'?'badge-income':'badge-expense'}">${p.type==='income'?'Ingreso':'Egreso'}</span></td>
+    <td style="font-weight:500;color:${p.type==='income'?'var(--navy)':'var(--c-red)'}">${p.type==='income'?'+':'−'}${fmt(p.amount)}</td>
+    <td style="color:var(--mist)">${ref}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">Eliminar</button></td>
+  </tr>`;}).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--mist);padding:1.5rem">Sin transacciones</td></tr>';
 }
 
 function openModalTransaction(type) {
@@ -556,28 +554,19 @@ async function saveTransaction() {
   const ref    = document.getElementById('transRef').value.trim();
   const notes  = document.getElementById('transNotes').value.trim();
   if (!date||!amount||!desc) { showToast('Completa fecha, monto y descripción','error'); return; }
-  const rec = {date,desc,description:desc,cat,category:cat,type,amount,ref,reference:ref,notes};
+  const rec = { type, date, amount, description:desc, category:cat, reference:ref, notes };
   try {
-    const sb=window.SUPABASE;
-    if (sb&&sb.config().hasKey) {
-      const {data,error}=await sb.insert('finances',toDbFinance(rec));
-      if(error) throw error;
-      const row=Array.isArray(data)?data[0]:data;
-      if(row) DB.finances.push({...rec,...row,id:row.id});
-      else DB.finances.push({...rec,id:DB.nextId++});
-    } else { DB.finances.push({...rec,id:DB.nextId++}); }
-  } catch(e) { console.warn(e); DB.finances.push({...rec,id:DB.nextId++}); }
-  closeModal('modalTransaction'); renderFinances();
+    const sb = window.SUPABASE;
+    const rows = await sb.insert('payments', toDbTransaction(rec));
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (row) DB.payments.push(normalizePayment(row));
+  } catch(e) {
+    console.error('Supabase insert transaction failed', e);
+    showToast('Error al guardar: '+(e?.message||e),'error');
+    return;
+  }
+  closeModal('modalTransaction'); renderFinances(); renderDashboard();
   showToast((type==='income'?'Ingreso':'Egreso')+' registrado: '+fmt(amount));
-}
-
-async function deleteTransaction(id) {
-  try {
-    const client=window.SUPABASE?.client?.();
-    if(client) await client.from('finances').delete().eq('id',id);
-  } catch(e){ console.warn(e); }
-  DB.finances=DB.finances.filter(f=>f.id!==id);
-  renderFinances(); showToast('Transacción eliminada');
 }
 
 /* ── IMPORT CSV ─────────────────────────────────────────────── */
@@ -602,21 +591,32 @@ async function doImport() {
   for (const line of lines) {
     const [date,desc,type,amount,cat,ref] = line.split('\t');
     if (date&&desc&&type&&amount) {
-      const rec={date:date.trim(),desc:desc.trim(),description:desc.trim(),cat:cat?.trim()||'Otros',category:cat?.trim()||'Otros',type:type.trim(),amount:parseFloat(amount)||0,ref:ref?.trim()||'',reference:ref?.trim()||'',notes:''};
+      const rec = { type:type.trim(), date:date.trim(), amount:parseFloat(amount)||0,
+        description:desc.trim(), category:cat?.trim()||'Otros', reference:ref?.trim()||'', notes:'' };
       try {
-        const sb=window.SUPABASE;
-        if(sb&&sb.config().hasKey){const{data,error}=await sb.insert('finances',toDbFinance(rec));if(!error){const row=Array.isArray(data)?data[0]:data;DB.finances.push({...rec,id:row?.id||DB.nextId++});}}
-        else DB.finances.push({...rec,id:DB.nextId++});
-      } catch(e){ DB.finances.push({...rec,id:DB.nextId++}); }
-      imported++;
+        const sb = window.SUPABASE;
+        const rows = await sb.insert('payments', toDbTransaction(rec));
+        const row = Array.isArray(rows) ? rows[0] : rows;
+        if (row) DB.payments.push(normalizePayment(row));
+        imported++;
+      } catch(e) { console.error('Import row failed', e); }
     }
   }
-  closeModal('modalImport'); renderFinances(); showToast(imported+' transacciones importadas ✓');
+  closeModal('modalImport'); renderFinances(); renderDashboard();
+  showToast(imported+' transacciones importadas ✓');
 }
 
 function exportCSV() {
+  const ledger = DB.payments.filter(p=>p.status==='approved');
   const headers='Fecha,Descripción,Tipo,Categoría,Monto,Referencia,Notas';
-  const rows=DB.finances.map(f=>`${f.date},"${f.desc||f.description||''}",${f.type},${f.cat||f.category||''},${f.amount},${f.ref||f.reference||''},"${f.notes||''}"`);
+  const txDate = p => p.approvedDate||p.approved_date||p.paymentDate||p.payment_date||'';
+  const rows = ledger.map(p=>{
+    const isResident = !!(p.residentId||p.resident_id);
+    const desc = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '');
+    const cat  = p.category || (isResident ? 'Mantenimiento' : '');
+    const ref  = p.reference || p.receiptNum || p.receipt_num || '';
+    return `${txDate(p)},"${desc}",${p.type},${cat},${p.amount},${ref},"${p.notes||''}"`;
+  });
   const csv=[headers,...rows].join('\n');
   const blob=new Blob([csv],{type:'text/csv'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob);

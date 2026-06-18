@@ -19,17 +19,15 @@ function normalizePayment(p) {
     residentName: p.residentName || p.resident_name || '',
     sentDate:     p.sentDate     || p.sent_date     || '',
     approvedDate: p.approvedDate || p.approved_date || null,
+    paymentDate:  p.paymentDate  || p.payment_date  || null,
     receiptNum:   p.receiptNum   || p.receipt_num   || null,
     receiptUrl:   p.receiptUrl   || p.receipt_url   || null,
     voucherUrl:   p.voucherUrl   || p.voucher_url   || null,
-  };
-}
-function normalizeFinance(f) {
-  if (!f) return f;
-  return { ...f,
-    desc:     f.desc     || f.description || '',
-    cat:      f.cat      || f.category    || '',
-    ref:      f.ref      || f.reference   || '',
+    type:         p.type         || 'income',
+    description:  p.description  || '',
+    category:     p.category     || '',
+    reference:    p.reference    || '',
+    notes:        p.notes        || '',
   };
 }
 function normalizeNotification(n) {
@@ -61,28 +59,25 @@ async function loadDB() {
     return;
   }
   try {
-    const [users, payments, finances, notifications] = await Promise.all([
+    const [users, payments, notifications] = await Promise.all([
       sb.list('users'),
       sb.list('payments'),
-      sb.list('finances'),
       sb.list('notifications').catch(e => { console.warn('Tabla notifications no disponible', e); return []; }),
     ]);
     DB.users         = (users         || []).map(normalizeUser);
     DB.payments      = (payments      || []).map(normalizePayment);
-    DB.finances      = (finances      || []).map(normalizeFinance);
     DB.notifications = (notifications || []).map(normalizeNotification);
     syncResidentsFromUsers();
 
     const maxId = Math.max(1,
       ...DB.users.map(u => Number(u.id)||0),
-      ...DB.payments.map(p => Number(p.id)||0),
-      ...DB.finances.map(f => Number(f.id)||0)
+      ...DB.payments.map(p => Number(p.id)||0)
     );
     DB.nextId = maxId + 1;
 
     console.info('✅ DB cargada desde Supabase', {
       users: DB.users.length, residents: DB.residents.length,
-      payments: DB.payments.length, finances: DB.finances.length,
+      payments: DB.payments.length,
       notifications: DB.notifications.length
     });
 
@@ -102,23 +97,26 @@ function toDbPayment(obj, currentUser, depto) {
     month:         obj.month,
     amount:        obj.amount,
     status:        'pending',
+    type:          'income',
     sent_date:     new Date().toISOString().split('T')[0],
     voucher_url:   obj.voucherUrl || null,
     payment_date:  obj.paymentDate || null,
   };
 }
 
-function toDbFinance(obj) {
+/* Ingreso/egreso registrado directamente por administración (sin residente/voucher) */
+function toDbTransaction(obj) {
   return {
-    date:        obj.date,
-    description: obj.desc || obj.description || '',
-    category:    obj.cat  || obj.category    || '',
-    type:        obj.type,
-    amount:      obj.amount,
-    reference:   obj.ref  || obj.reference   || '',
-    notes:       obj.notes || '',
-    cat:         obj.cat  || obj.category    || '',
-    ref:         obj.ref  || obj.reference   || '',
+    type:          obj.type,
+    amount:        obj.amount,
+    description:   obj.description || '',
+    category:      obj.category    || '',
+    reference:     obj.reference   || '',
+    notes:         obj.notes       || '',
+    status:        'approved',
+    approved_date: obj.date,
+    payment_date:  obj.date,
+    sent_date:     obj.date,
   };
 }
 
