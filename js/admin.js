@@ -224,6 +224,7 @@ function renderPayments() {
     <td style="display:flex;gap:6px">
       <button class="btn btn-success btn-sm" onclick="approvePayment(${p.id})">✓ Aprobar</button>
       <button class="btn btn-danger btn-sm"  onclick="rejectPayment(${p.id})">✕ Rechazar</button>
+      <button class="btn btn-danger btn-sm"  onclick="deletePayment(${p.id})">🗑 Eliminar</button>
     </td></tr>`).join()||'<tr><td colspan="8" style="text-align:center;color:var(--mist);padding:1.5rem">Sin comprobantes pendientes ✓</td></tr>';
 
   document.getElementById('tblAllPayments').innerHTML = all.map(p=>`<tr>
@@ -231,6 +232,7 @@ function renderPayments() {
     <td>${p.month||'—'}</td><td>${fmt(p.amount)}</td>
     <td><span class="badge ${p.status==='approved'?'badge-approved':p.status==='pending'?'badge-pending':'badge-rejected'}">${p.status==='approved'?'Aprobado':p.status==='pending'?'Pendiente':'Rechazado'}</span></td>
     <td>${(p.receiptNum||p.receipt_num)?`<button class="btn btn-secondary btn-sm" onclick="showReceipt(${p.id})">${p.receiptNum||p.receipt_num}</button>`:'—'}</td>
+    <td><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">🗑 Eliminar</button></td>
   </tr>`).join('');
   updatePendingCounts();
 }
@@ -321,6 +323,62 @@ async function rejectPayment(id) {
   renderPayments(); showToast('Comprobante rechazado','error'); updatePendingCounts();
 }
 
+/* ── DELETE PAYMENT (comprobante + recibo + ingreso vinculado) ── */
+async function deletePayment(id, folderDepto) {
+  const p = DB.payments.find(p=>p.id===id);
+  if (!p) return;
+  if (!confirm('¿Eliminar este comprobante de forma permanente? Se borrará el comprobante, el recibo y, si aplica, el ingreso registrado en Finanzas. Esta acción no se puede deshacer.')) return;
+
+  const client      = window.SUPABASE?.client?.();
+  const voucherUrl  = p.voucherUrl || p.voucher_url || null;
+  const receiptUrl  = p.receiptUrl || p.receipt_url || null;
+  const receiptNum  = p.receiptNum || p.receipt_num || null;
+
+  try {
+    if (client && voucherUrl) {
+      const marker = '/comprobantes/';
+      const idx = voucherUrl.indexOf(marker);
+      if (idx !== -1) {
+        const path = decodeURIComponent(voucherUrl.slice(idx + marker.length));
+        const { error: rmError } = await client.storage.from('comprobantes').remove([path]);
+        if (rmError) console.warn('No se pudo eliminar el comprobante del storage', rmError);
+      }
+    }
+    if (client && receiptUrl) {
+      const marker = '/recibos/';
+      const idx = receiptUrl.indexOf(marker);
+      if (idx !== -1) {
+        const path = decodeURIComponent(receiptUrl.slice(idx + marker.length));
+        const { error: rmError } = await client.storage.from('recibos').remove([path]);
+        if (rmError) console.warn('No se pudo eliminar el recibo del storage', rmError);
+      }
+    }
+    if (client && receiptNum) {
+      const { error: finError } = await client.from('finances').delete().eq('reference', receiptNum);
+      if (finError) console.warn('No se pudo eliminar el ingreso vinculado en finanzas', finError);
+    }
+
+    await window.SUPABASE.remove('payments', id);
+  } catch(e) {
+    console.error('Supabase delete payment failed', e);
+    showToast('Error al eliminar el comprobante: '+(e?.message||e), 'error');
+    return;
+  }
+
+  DB.payments  = DB.payments.filter(p=>p.id!==id);
+  if (receiptNum) DB.finances = DB.finances.filter(f=>(f.reference||f.ref)!==receiptNum);
+
+  renderPayments();
+  if (typeof renderVouchers === 'function') renderVouchers();
+  if (typeof renderFinances === 'function') renderFinances();
+  updatePendingCounts();
+
+  const folderModalOpen = document.getElementById('modalFolder')?.classList.contains('open');
+  if (folderModalOpen && folderDepto) openDeptoFolder(folderDepto);
+
+  showToast('✓ Comprobante eliminado');
+}
+
 function viewVoucher(id) {
   const p = DB.payments.find(p=>p.id===id);
   if (!p) return;
@@ -397,6 +455,7 @@ function openDeptoFolder(depto) {
             <td style="display:flex;gap:4px">
               ${p.voucherUrl||p.voucher_url?`<button class="btn btn-secondary btn-sm" onclick="window.open('${p.voucherUrl||p.voucher_url}','_blank')">Ver</button>`:''}
               ${p.receiptNum||p.receipt_num?`<button class="btn btn-gold btn-sm" onclick="showReceipt(${p.id})">Recibo</button>`:''}
+              <button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id},'${depto}')">🗑</button>
             </td>
           </tr>`;
         }).join('')||'<tr><td colspan="5" style="text-align:center;color:var(--mist);padding:1rem">Sin archivos</td></tr>'}
