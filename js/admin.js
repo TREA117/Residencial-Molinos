@@ -340,8 +340,10 @@ async function deletePayment(id, folderDepto) {
       const idx = voucherUrl.indexOf(marker);
       if (idx !== -1) {
         const path = decodeURIComponent(voucherUrl.slice(idx + marker.length));
-        const { error: rmError } = await client.storage.from('comprobantes').remove([path]);
-        if (rmError) console.warn('No se pudo eliminar el comprobante del storage', rmError);
+        const { data: rmData, error: rmError } = await client.storage.from('comprobantes').remove([path]);
+        console.info('Eliminar comprobante storage', { path, rmData, rmError });
+        if (rmError) throw new Error('No se pudo eliminar el comprobante del storage (ruta: '+path+'): '+(rmError.message||rmError));
+        if (!rmData || rmData.length === 0) throw new Error('El comprobante no se encontró en el storage (ruta: '+path+'). Verifica el bucket "comprobantes".');
       }
     }
     if (client && receiptUrl) {
@@ -349,13 +351,15 @@ async function deletePayment(id, folderDepto) {
       const idx = receiptUrl.indexOf(marker);
       if (idx !== -1) {
         const path = decodeURIComponent(receiptUrl.slice(idx + marker.length));
-        const { error: rmError } = await client.storage.from('recibos').remove([path]);
-        if (rmError) console.warn('No se pudo eliminar el recibo del storage', rmError);
+        const { data: rmData, error: rmError } = await client.storage.from('recibos').remove([path]);
+        console.info('Eliminar recibo storage', { path, rmData, rmError });
+        if (rmError) throw new Error('No se pudo eliminar el recibo del storage (ruta: '+path+'): '+(rmError.message||rmError));
+        if (!rmData || rmData.length === 0) throw new Error('El recibo no se encontró en el storage (ruta: '+path+'). Verifica el bucket "recibos".');
       }
     }
     if (client && receiptNum) {
       const { error: finError } = await client.from('finances').delete().eq('reference', receiptNum);
-      if (finError) console.warn('No se pudo eliminar el ingreso vinculado en finanzas', finError);
+      if (finError) throw new Error('No se pudo eliminar el ingreso vinculado en finanzas: '+(finError.message||finError));
     }
 
     await window.SUPABASE.remove('payments', id);

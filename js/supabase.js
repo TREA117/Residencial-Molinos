@@ -99,6 +99,11 @@
     if (SUPABASE_CLIENT) {
       const { data, error } = await SUPABASE_CLIENT.from(table).delete().eq('id', id).select();
       if (error) throw error;
+      // PostgREST no lanza error si las políticas RLS bloquean el delete: simplemente
+      // no afecta ninguna fila. Sin esta verificación, el borrado fallaría en silencio.
+      if (!data || data.length === 0) {
+        throw new Error(`No se eliminó ninguna fila en "${table}" (revisa las políticas RLS de DELETE)`);
+      }
       return data;
     }
     return apiFetch(`${table}?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' });
