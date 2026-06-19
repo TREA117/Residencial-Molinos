@@ -751,8 +751,17 @@ function normalizeImportDate(raw) {
     const [y,m,d] = raw.split('-');
     return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
   }
-  const dmy = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmy) { const [,d,m,y] = dmy; return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; }
+  const slash = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (slash) {
+    // Excel exporta como MES/DÍA/AÑO (EE.UU.) la mayoría de las veces.
+    // Si el primer número no puede ser mes (>12), se interpreta al revés
+    // (DÍA/MES/AÑO) en vez de generar una fecha inválida.
+    let [, a, b, y] = slash;
+    let month = parseInt(a,10), day = parseInt(b,10);
+    if (month > 12 && day <= 12) { const t = month; month = day; day = t; }
+    if (month > 12 || day > 31) return '';
+    return `${y}-${String(month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+  }
   const parsed = new Date(raw);
   return isNaN(parsed) ? '' : parsed.toISOString().split('T')[0];
 }

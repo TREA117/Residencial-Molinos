@@ -3,7 +3,16 @@
    ================================================================ */
 
 const fmt     = n => new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN' }).format(n);
-const fmtDate = d => { try { return new Date(d).toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' }); } catch(e){ return d||'—'; } };
+/* 'YYYY-MM-DD' se interpreta como UTC medianoche si se pasa directo a Date();
+   al convertir a hora local (México, detrás de UTC) se corre un día atrás.
+   Se construye la fecha con los componentes en hora LOCAL para evitar eso. */
+const fmtDate = d => {
+  try {
+    const m = String(d).match(/^(\d{4})-(\d{2})-(\d{2})/);
+    const date = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(d);
+    return date.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
+  } catch(e) { return d||'—'; }
+};
 let chartFlow = null, chartDist = null;
 
 /* ── DEMO LOGIN HELPER ──────────────────────────────────────── */
