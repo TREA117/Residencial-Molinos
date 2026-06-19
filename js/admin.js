@@ -315,12 +315,14 @@ async function approvePayment(id) {
   try {
     const blob = await generateReceiptImageBlob(p);
     const url  = await uploadReceiptImage(p, blob);
+    if (!url) throw new Error('uploadReceiptImage no devolvió una URL');
     await window.SUPABASE.update('payments', id, { receipt_url: url });
     p.receiptUrl = url; p.receipt_url = url;
     if (typeof renderMyPayments === 'function') renderMyPayments();
     if (typeof renderVouchers === 'function') renderVouchers();
   } catch(e) {
-    console.warn('No se pudo pre-generar el recibo en Storage', e);
+    console.error('No se pudo pre-generar/subir el recibo a Storage', e);
+    showToast('Recibo aprobado, pero no se pudo subir a Storage: '+(e?.message||e), 'error');
   }
 
   showReceipt(id);
