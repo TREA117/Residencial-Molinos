@@ -265,18 +265,16 @@
           <div class="card-head">
             <span class="card-title">Transacciones</span>
             <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-              <input type="date" id="filterFinFrom" title="Desde" style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
-              <input type="date" id="filterFinTo" title="Hasta" style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
+              <select id="filterFinMonth" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
+                <option value="">Todos los meses</option>
+              </select>
               <select id="filterFinType" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
                 <option value="">Todo</option><option value="income">Ingresos</option><option value="expense">Egresos</option>
-              </select>
-              <select id="filterFinCat" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
-                <option value="">Todas las categorías</option>
               </select>
             </div>
           </div>
           <div class="tbl-wrap"><table>
-            <thead><tr><th>Fecha</th><th>Descripción</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Referencia</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Proveedor</th><th>Concepto</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Referencia</th><th>Acciones</th></tr></thead>
             <tbody id="tblFinances"></tbody>
           </table></div>
         </div>

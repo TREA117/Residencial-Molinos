@@ -636,20 +636,17 @@ async function downloadAndCleanup() {
 
 /* ── FINANCES (ledger completo: pagos de residentes + movimientos manuales) ── */
 function renderFinances() {
-  const type = document.getElementById('filterFinType')?.value||'';
-  const cat  = document.getElementById('filterFinCat')?.value||'';
-  const from = document.getElementById('filterFinFrom')?.value||'';
-  const to   = document.getElementById('filterFinTo')?.value||'';
+  const month = document.getElementById('filterFinMonth')?.value||'';
+  const type  = document.getElementById('filterFinType')?.value||'';
   const ledger = DB.payments.filter(p=>p.status==='approved');
   const txDateFilter = p => p.approvedDate||p.approved_date||p.paymentDate||p.payment_date||'';
   const filtered = ledger.filter(p=>
     (!type||p.type===type) &&
-    (!cat||(p.category||'')===cat) &&
-    (!from && !to || inDateRange(txDateFilter(p), from, to))
+    (!month || String(txDateFilter(p)).startsWith(month))
   );
   const totalIn  = filtered.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalEx  = filtered.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
-  const remanente = calcRemanente(from || firstDayOfCurrentMonth());
+  const remanente = calcRemanente(month ? month+'-01' : firstDayOfCurrentMonth());
   const fm = document.getElementById('finMetrics');
   if (fm) fm.innerHTML = `
     <div class="metric"><div class="metric-label">Remanente mes anterior</div><div class="metric-value" style="color:${remanente>=0?'var(--navy)':'var(--c-red)'}">${fmt(remanente)}</div></div>
@@ -657,25 +654,32 @@ function renderFinances() {
     <div class="metric"><div class="metric-label">Egresos filtrados</div><div class="metric-value" style="color:var(--c-red)">${fmt(totalEx)}</div></div>
     <div class="metric"><div class="metric-label">Balance</div><div class="metric-value" style="color:${totalIn-totalEx>=0?'var(--navy)':'var(--c-red)'}">${fmt(totalIn-totalEx)}</div></div>`;
 
-  const cats = [...new Set(ledger.map(p=>p.category||'Otros').filter(Boolean))];
-  const cs = document.getElementById('filterFinCat');
-  if (cs&&cs.children.length<=1) cats.forEach(c=>{const o=document.createElement('option');o.value=c;o.textContent=c;cs.appendChild(o);});
+  const ms = document.getElementById('filterFinMonth');
+  if (ms && ms.children.length<=1) {
+    const months = [...new Set(ledger.map(p=>String(txDateFilter(p)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+    months.forEach(m=>{
+      const [y,mo] = m.split('-');
+      const label = new Date(+y,+mo-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+      const o = document.createElement('option'); o.value=m; o.textContent=label.charAt(0).toUpperCase()+label.slice(1);
+      ms.appendChild(o);
+    });
+  }
 
   const txDate = p => p.approvedDate||p.approved_date||p.paymentDate||p.payment_date;
   const tf = document.getElementById('tblFinances');
   if (tf) tf.innerHTML = filtered.sort((a,b)=>new Date(txDate(b))-new Date(txDate(a))).map(p=>{
     const isResident = !!(p.residentId||p.resident_id);
-    const descBase = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
-    const desc = p.provider ? `<strong>${p.provider}</strong> — ${descBase}` : descBase;
+    const concepto  = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
+    const proveedor = p.provider || (isResident ? (p.residentName||p.resident_name||'—') : '—');
     const cat  = p.category || (isResident ? 'Mantenimiento' : '—');
     const ref  = p.reference || p.receiptNum || p.receipt_num || '—';
     return `<tr>
-    <td>${fmtDate(txDate(p))}</td><td>${desc}</td><td>${cat}</td>
+    <td>${fmtDate(txDate(p))}</td><td>${proveedor}</td><td>${concepto}</td><td>${cat}</td>
     <td><span class="badge ${p.type==='income'?'badge-income':'badge-expense'}">${p.type==='income'?'Ingreso':'Egreso'}</span></td>
     <td style="font-weight:500;color:${p.type==='income'?'var(--navy)':'var(--c-red)'}">${p.type==='income'?'+':'−'}${fmt(p.amount)}</td>
     <td style="color:var(--mist)">${ref}</td>
     <td><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">Eliminar</button></td>
-  </tr>`;}).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--mist);padding:1.5rem">Sin transacciones</td></tr>';
+  </tr>`;}).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--mist);padding:1.5rem">Sin transacciones</td></tr>';
 }
 
 function openModalTransaction(type) {
