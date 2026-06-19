@@ -282,13 +282,14 @@ body {
 .card-body  { padding: 1.25rem; }
 
 /* ── TABLE ─────────────────────────────────────────────────── */
-.tbl-wrap { overflow-x: auto; }
+.tbl-wrap { overflow-x: auto; overflow-y: auto; max-height: 440px; }
 table { width: 100%; border-collapse: collapse; font-size: 13px; }
 table th {
   text-align: left; font-size: 11px; font-weight: 600; color: var(--white);
   text-transform: uppercase; letter-spacing: 0.05em;
   padding: 8px 12px; border-bottom: 1px solid var(--gold);
   background: var(--navy); white-space: nowrap;
+  position: sticky; top: 0; z-index: 1;
 }
 table td { padding: 10px 12px; border-bottom: 1px solid var(--c-bg); vertical-align: middle; }
 table tr:last-child td { border-bottom: none; }

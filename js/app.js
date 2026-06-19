@@ -88,7 +88,7 @@ function checkPaymentBanner() {
     const res = DB.residents.find(r =>
       r.userId === currentUser.id || r.user_id === currentUser.id || r.email === currentUser.email
     );
-    const fee = res?.fee || currentUser.fee || DB.settings?.defaultFee || 400;
+    const fee = DB.settings?.defaultFee || 400;
     const monthName = today.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
     banner.classList.remove('hidden');
     banner.innerHTML = `
@@ -115,7 +115,7 @@ function renderMyPayments() {
   );
   const depto  = res?.depto  || currentUser.depto  || '—';
   const status = res?.status || currentUser.deptoStatus || currentUser.depto_status || (currentUser.depto ? 'approved' : 'pending');
-  const fee    = res?.fee    || currentUser.fee    || DB.settings?.defaultFee || 400;
+  const fee    = DB.settings?.defaultFee || 400;
 
   const deptoNumEl    = document.getElementById('resDeptoNum');
   const deptoStatusEl = document.getElementById('resDeptoStatus');
@@ -165,8 +165,12 @@ function renderMyPayments() {
         <td>${(p.receiptNum||p.receipt_num)
           ? `<button class="btn btn-secondary btn-sm" onclick="showReceipt(${p.id})">${p.receiptNum||p.receipt_num}</button>`
           : '—'}</td>
+        <td style="display:flex;gap:4px;flex-wrap:wrap">
+          <span class="badge ${(p.receiptUrl||p.receipt_url)?'badge-approved':'badge-rejected'}">${(p.receiptUrl||p.receipt_url)?'Recibo ✓':'Recibo ✕'}</span>
+          <span class="badge ${(p.voucherUrl||p.voucher_url)?'badge-approved':'badge-rejected'}">${(p.voucherUrl||p.voucher_url)?'Comprobante ✓':'Comprobante ✕'}</span>
+        </td>
       </tr>`).join('') ||
-      '<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin pagos registrados</td></tr>';
+      '<tr><td colspan="7" style="text-align:center;color:var(--mist);padding:1.5rem">Sin pagos registrados</td></tr>';
   }
 }
 
@@ -195,7 +199,7 @@ function renderMyAccount() {
   const pending  = myPays.filter(p => p.status === 'pending');
   const rejected = myPays.filter(p => p.status === 'rejected');
   const totalPaid = approved.reduce((s,p) => s + Number(p.amount||0), 0);
-  const fee = currentUser.fee || DB.settings?.defaultFee || 400;
+  const fee = DB.settings?.defaultFee || 400;
 
   const area = document.getElementById('accountArea');
   if (!area) return;
@@ -480,17 +484,19 @@ function getLogoDataUrl(boxW, boxH) {
   return __logoDataUrlCache[key];
 }
 
-/* Renderiza el recibo a una imagen JPEG comprimida (peso mínimo) */
+/* Renderiza el recibo a una imagen JPEG comprimida (peso mínimo), recortada
+   exactamente al tamaño del recibo — sin espacios en blanco alrededor. */
 async function generateReceiptImageBlob(p) {
   const container = document.createElement('div');
   container.style.position = 'fixed';
   container.style.left     = '-9999px';
   container.style.top      = '0';
-  container.style.width    = '520px';
+  container.style.width    = '480px'; // = max-width de .receipt, sin margen extra
   container.style.background = '#fff';
   container.innerHTML = buildReceiptHTML(p);
   document.body.appendChild(container);
   try {
+    const receiptEl = container.querySelector('.receipt') || container;
     const watermark = container.querySelector('.receipt-watermark');
     if (watermark) {
       try {
@@ -500,7 +506,7 @@ async function generateReceiptImageBlob(p) {
       } catch(e) { console.warn('No se pudo incrustar la marca de agua', e); }
     }
     await waitForImages(container);
-    const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true });
+    const canvas = await html2canvas(receiptEl, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true });
     return await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.8));
   } finally {
     container.remove();

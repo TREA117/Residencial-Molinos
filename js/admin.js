@@ -195,7 +195,6 @@ function editResidentModal(id) {
   document.getElementById('editResEmail').value = r.email ||'';
   document.getElementById('editResPhone').value = r.phone ||'';
   document.getElementById('editResDepto').value = r.depto ||'';
-  document.getElementById('editResFee').value   = r.fee   ||DB.settings?.defaultFee||400;
   document.getElementById('editResStatus').value= r.status||'pending';
   openModal('modalEditResident');
 }
@@ -208,13 +207,12 @@ async function saveEditResident() {
   const email  = document.getElementById('editResEmail').value.trim();
   const phone  = document.getElementById('editResPhone').value.trim();
   const depto  = document.getElementById('editResDepto').value.trim().toUpperCase().replace(/\s+/g,'');
-  const fee    = parseFloat(document.getElementById('editResFee').value)||DB.settings?.defaultFee||400;
   const status = document.getElementById('editResStatus').value;
   try {
-    await window.SUPABASE.update('users', id, { name, email, phone, depto, fee, depto_status: status });
-    r.name=name; r.email=email; r.phone=phone; r.depto=depto; r.fee=fee; r.status=status;
+    await window.SUPABASE.update('users', id, { name, email, phone, depto, depto_status: status });
+    r.name=name; r.email=email; r.phone=phone; r.depto=depto; r.status=status;
     const u = DB.users.find(u=>Number(u.id)===id);
-    if (u) { u.name=name; u.email=email; u.phone=phone; u.depto=depto; u.fee=fee; u.depto_status=status; u.deptoStatus=status; }
+    if (u) { u.name=name; u.email=email; u.phone=phone; u.depto=depto; u.depto_status=status; u.deptoStatus=status; }
     closeModal('modalEditResident'); renderResidents(); showToast('Residente actualizado ✓');
   } catch(e) {
     console.error('Supabase update user failed', e);
@@ -224,7 +222,6 @@ async function saveEditResident() {
 
 function openModalAddResident() {
   ['newResName','newResEmail','newResPhone','newResDepto'].forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
-  const fee=document.getElementById('newResFee'); if(fee) fee.value=DB.settings?.defaultFee||400;
   openModal('modalAddResident');
 }
 async function saveNewResident() {
@@ -232,14 +229,13 @@ async function saveNewResident() {
   const email  = document.getElementById('newResEmail').value.trim();
   const phone  = document.getElementById('newResPhone').value.trim();
   const depto  = document.getElementById('newResDepto').value.trim().toUpperCase().replace(/\s+/g,'');
-  const fee    = parseFloat(document.getElementById('newResFee').value)||DB.settings?.defaultFee||400;
   const status = document.getElementById('newResStatus').value;
   if (!name||!depto) { showToast('Nombre y departamento son requeridos','error'); return; }
   try {
     const sb = window.SUPABASE;
     if (sb && sb.config().hasKey) {
       const rows = await sb.insert('users', {
-        name, email, phone, depto, fee, role:'resident',
+        name, email, phone, depto, role:'resident',
         depto_status: status, password_hash: ''
       });
       const row = Array.isArray(rows) ? rows[0] : rows;
@@ -591,9 +587,10 @@ async function downloadAndCleanup() {
     return;
   }
 
-  // Limpieza real: storage (comprobantes + recibos) y filas de payments
+  // Limpieza real: solo borra los archivos en storage (comprobantes + recibos)
+  // y limpia receipt_url/voucher_url — la fila de payments se conserva.
   const client = window.SUPABASE?.client?.();
-  const archivedIds = [];
+  const clearedIds = [];
   for (const p of toArchive) {
     try {
       const voucherUrl = p.voucherUrl||p.voucher_url || null;
@@ -614,23 +611,25 @@ async function downloadAndCleanup() {
           if (!data || data.length === 0) throw new Error('Recibo no encontrado en storage (ruta: '+path+')');
         }
       }
-      await window.SUPABASE.remove('payments', p.id);
-      archivedIds.push(p.id);
+      await window.SUPABASE.update('payments', p.id, { receipt_url: null, voucher_url: null });
+      p.receiptUrl = null; p.receipt_url = null;
+      p.voucherUrl = null; p.voucher_url = null;
+      clearedIds.push(p.id);
     } catch(e) {
-      console.error('No se pudo archivar/eliminar el pago', p.id, e);
+      console.error('No se pudo limpiar el archivo del pago', p.id, e);
     }
   }
 
-  DB.payments = DB.payments.filter(p => !archivedIds.includes(p.id));
   renderVouchers();
   if (typeof renderPayments === 'function') renderPayments();
   if (typeof renderFinances === 'function') renderFinances();
+  if (typeof renderMyPayments === 'function') renderMyPayments();
   updatePendingCounts();
 
-  if (archivedIds.length === toArchive.length) {
-    showToast(`✓ ZIP descargado — ${archivedIds.length} comprobantes archivados y eliminados`);
+  if (clearedIds.length === toArchive.length) {
+    showToast(`✓ ZIP descargado — ${clearedIds.length} comprobantes/recibos eliminados del storage (las filas se conservan)`);
   } else {
-    showToast(`ZIP descargado — ${archivedIds.length} de ${toArchive.length} eliminados (revisa la consola)`,'error');
+    showToast(`ZIP descargado — ${clearedIds.length} de ${toArchive.length} limpiados (revisa la consola)`,'error');
   }
 }
 
@@ -898,7 +897,7 @@ function renderReports() {
       return (p.month||'').toLowerCase().includes(mn.toLowerCase());
     });
     return `<tr>
-      <td><strong>${r.depto||'—'}</strong></td><td>${r.name}</td><td>${fmt(r.fee||DB.settings?.defaultFee||400)}</td>
+      <td><strong>${r.depto||'—'}</strong></td><td>${r.name}</td><td>${fmt(DB.settings?.defaultFee||400)}</td>
       <td><span class="badge ${hasCurrent?'badge-approved':r.status==='approved'?'badge-pending':'badge-rejected'}">${hasCurrent?'Pagado':r.status==='approved'?'Pendiente':'Inactivo'}</span></td>
       <td>${latest?fmtDate(latest.approvedDate||latest.approved_date):'—'}</td>
     </tr>`;

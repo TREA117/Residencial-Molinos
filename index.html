@@ -6,7 +6,7 @@
 <title>Real Molinos 3 — Privada</title>
 <link rel="icon" href="assets/LogoM3.svg" type="image/svg+xml">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/styles.css?v=20260619a">
+<link rel="stylesheet" href="css/styles.css?v=20260619b">
 </head>
 <body>
 
@@ -329,8 +329,9 @@
         </div>
         <div class="card">
           <div class="card-head"><span class="card-title">Mis pagos</span></div>
+          <div style="padding:10px 1.25rem 0;font-size:12px;color:var(--mist)">☁️ Vouchers y recibos disponibles en la nube solo el mes de pago.</div>
           <div class="tbl-wrap"><table>
-            <thead><tr><th>Mes</th><th>Monto</th><th>Fecha pago</th><th>Enviado</th><th>Estado</th><th>Recibo</th></tr></thead>
+            <thead><tr><th>Mes</th><th>Monto</th><th>Fecha pago</th><th>Enviado</th><th>Estado</th><th>Recibo</th><th>Disponibilidad</th></tr></thead>
             <tbody id="tblMyPayments"></tbody>
           </table></div>
         </div>
@@ -479,12 +480,10 @@
         <div class="field"><label>Correo</label><input type="email" id="newResEmail" placeholder="juan@correo.com"></div>
         <div class="field"><label>Teléfono</label><input type="tel" id="newResPhone" placeholder="555 000 0000"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Cuota mensual (MXN)</label><input type="number" id="newResFee" placeholder="400" value="400"></div>
-        <div class="field"><label>Estado</label>
-          <select id="newResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option></select>
-        </div>
+      <div class="field"><label>Estado</label>
+        <select id="newResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option></select>
       </div>
+      <div style="font-size:11px;color:var(--mist)">La cuota mensual ($400) es la misma para todos los residentes y se controla desde Editar contactos.</div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modalAddResident')">Cancelar</button>
@@ -507,12 +506,10 @@
         <div class="field"><label>Correo</label><input type="email" id="editResEmail"></div>
         <div class="field"><label>Teléfono</label><input type="tel" id="editResPhone"></div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Cuota (MXN)</label><input type="number" id="editResFee"></div>
-        <div class="field"><label>Estado</label>
-          <select id="editResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option><option value="rejected">Rechazado</option></select>
-        </div>
+      <div class="field"><label>Estado</label>
+        <select id="editResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option><option value="rejected">Rechazado</option></select>
       </div>
+      <div style="font-size:11px;color:var(--mist)">La cuota mensual ($400) es la misma para todos los residentes y se controla desde Editar contactos.</div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modalEditResident')">Cancelar</button>
@@ -571,11 +568,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
-<script src="js/supabase.js?v=20260619a"></script>
-<script src="js/db.js?v=20260619a"></script>
-<script src="js/data.js?v=20260619a"></script>
-<script src="js/auth.js?v=20260619a"></script>
-<script src="js/app.js?v=20260619a"></script>
-<script src="js/admin.js?v=20260619a"></script>
+<script src="js/supabase.js?v=20260619b"></script>
+<script src="js/db.js?v=20260619b"></script>
+<script src="js/data.js?v=20260619b"></script>
+<script src="js/auth.js?v=20260619b"></script>
+<script src="js/app.js?v=20260619b"></script>
+<script src="js/admin.js?v=20260619b"></script>
 </body>
 </html>
