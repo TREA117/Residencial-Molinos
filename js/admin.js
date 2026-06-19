@@ -12,6 +12,26 @@ function inDateRange(dateStr, from, to) {
   return true;
 }
 
+function txLedgerDate(p) {
+  return p.approvedDate||p.approved_date||p.paymentDate||p.payment_date||p.sentDate||p.sent_date||'';
+}
+
+/* Remanente = balance acumulado (ingresos − egresos aprobados) de TODO lo
+   anterior a `beforeDate` (exclusivo, 'YYYY-MM-DD'). Se calcula solo —
+   administración no tiene que escribirlo cada mes — siempre que el
+   histórico de pagos/transacciones esté importado en la tabla payments. */
+function calcRemanente(beforeDate) {
+  if (!beforeDate) return 0;
+  return DB.payments
+    .filter(p => p.status==='approved' && txLedgerDate(p) && txLedgerDate(p) < beforeDate)
+    .reduce((s,p) => s + (p.type==='expense' ? -1 : 1) * Number(p.amount||0), 0);
+}
+
+function firstDayOfCurrentMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+}
+
 function renderDashboard() {
   const from = document.getElementById('dashFrom')?.value || '';
   const to   = document.getElementById('dashTo')?.value   || '';
@@ -23,6 +43,7 @@ function renderDashboard() {
     : approvedAll;
   const totalIncome    = approved.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalExpense   = approved.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
+  const remanente       = calcRemanente(from || firstDayOfCurrentMonth());
   const balance        = totalIncome - totalExpense;
   const approvedRes    = DB.residents.filter(r=>r.status==='approved').length;
   const pendingRes     = DB.residents.filter(r=>r.status==='pending').length;
@@ -30,6 +51,7 @@ function renderDashboard() {
 
   const area = document.getElementById('metricsArea');
   if (area) area.innerHTML = `
+    <div class="metric"><div class="metric-label">Remanente mes anterior</div><div class="metric-value" style="color:${remanente>=0?'var(--navy)':'var(--c-red)'}">${fmt(remanente)}</div><div class="metric-change">acumulado a la fecha de inicio</div></div>
     <div class="metric"><div class="metric-label">Balance${hasFilter?' (filtrado)':' total'}</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div><div class="metric-change">Ingresos − Egresos</div></div>
     <div class="metric"><div class="metric-label">Ingresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalIncome)}</div><div class="metric-change up">↑ acumulado</div></div>
     <div class="metric"><div class="metric-label">Egresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalExpense)}</div><div class="metric-change down">↓ acumulado</div></div>
@@ -627,8 +649,10 @@ function renderFinances() {
   );
   const totalIn  = filtered.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalEx  = filtered.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
+  const remanente = calcRemanente(from || firstDayOfCurrentMonth());
   const fm = document.getElementById('finMetrics');
   if (fm) fm.innerHTML = `
+    <div class="metric"><div class="metric-label">Remanente mes anterior</div><div class="metric-value" style="color:${remanente>=0?'var(--navy)':'var(--c-red)'}">${fmt(remanente)}</div></div>
     <div class="metric"><div class="metric-label">Ingresos filtrados</div><div class="metric-value" style="color:var(--navy)">${fmt(totalIn)}</div></div>
     <div class="metric"><div class="metric-label">Egresos filtrados</div><div class="metric-value" style="color:var(--c-red)">${fmt(totalEx)}</div></div>
     <div class="metric"><div class="metric-label">Balance</div><div class="metric-value" style="color:${totalIn-totalEx>=0?'var(--navy)':'var(--c-red)'}">${fmt(totalIn-totalEx)}</div></div>`;
@@ -712,6 +736,20 @@ function selectImportMethod(m) {
         <textarea id="expensesPaste" placeholder="2026-06-01	Proveedor SA	Compra de material de limpieza	1500.00" style="height:100px;font-family:monospace;font-size:12px"></textarea>
       </div>`;
     btn.style.display='inline-flex';
+  } else if (m==='incomes') {
+    area.innerHTML = `
+      <div class="field"><label>Archivo CSV (fecha, monto)</label>
+        <div class="upload-zone" onclick="document.getElementById('incomesFile').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;margin:0 auto 6px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div id="incomesFileLabel">Seleccionar .csv</div>
+          <div style="font-size:11px;color:var(--mist);margin-top:4px">fecha (AAAA-MM-DD), monto</div>
+        </div>
+        <input type="file" id="incomesFile" accept=".csv" style="display:none" onchange="document.getElementById('incomesFileLabel').textContent=this.files[0]?.name||'Seleccionar .csv'">
+      </div>
+      <div class="field"><label>O pega desde Excel (Tab separado)</label>
+        <textarea id="incomesPaste" placeholder="2026-05-03	1500.00" style="height:100px;font-family:monospace;font-size:12px"></textarea>
+      </div>`;
+    btn.style.display='inline-flex';
   }
 }
 
@@ -747,6 +785,7 @@ function normalizeImportDate(raw) {
 async function doImport() {
   const area = document.getElementById('importMethodArea');
   if (area?.dataset.mode === 'expenses') return doImportExpenses();
+  if (area?.dataset.mode === 'incomes')  return doImportIncomes();
 
   const csvFileEl = document.getElementById('csvFile');
   const pasteEl    = document.getElementById('pasteData');
@@ -814,6 +853,40 @@ async function doImportExpenses() {
   showToast(`${imported} egresos importados${failed?` (${failed} con error, revisa formato de fecha/monto)`:''} ✓`, failed && !imported ? 'error' : 'success');
 }
 
+async function doImportIncomes() {
+  const fileEl  = document.getElementById('incomesFile');
+  const pasteEl = document.getElementById('incomesPaste');
+  let lines, delim;
+  if (fileEl?.files?.[0]) {
+    const text = await fileEl.files[0].text();
+    lines = text.trim().split('\n'); delim = ',';
+  } else if (pasteEl?.value.trim()) {
+    lines = pasteEl.value.trim().split('\n'); delim = '\t';
+  } else {
+    showToast('Selecciona un archivo o pega los datos','error'); return;
+  }
+
+  let imported = 0, failed = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    const [dateRaw, amountRaw] = parseDelimitedRow(line, delim).map(c=>(c||'').trim());
+    const date = normalizeImportDate(dateRaw);
+    if (!date && i === 0) continue; // encabezado (fecha,monto)
+    const amount = parseFloat(String(amountRaw||'').replace(/[^0-9.\-]/g,''));
+    if (!date || !amount) { failed++; continue; }
+    try {
+      const rec = { type:'income', date, amount, description:'Ingreso registrado', category:'Ingresos importados', reference:'', notes:'' };
+      const rows = await window.SUPABASE.insert('payments', toDbTransaction(rec));
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      if (row) DB.payments.push(normalizePayment(row));
+      imported++;
+    } catch(e) { console.error('Import ingreso failed', line, e); failed++; }
+  }
+  closeModal('modalImport'); renderFinances(); renderDashboard();
+  showToast(`${imported} ingresos importados${failed?` (${failed} con error, revisa formato de fecha/monto)`:''} ✓`, failed && !imported ? 'error' : 'success');
+}
+
 function exportCSV() {
   const ledger = DB.payments.filter(p=>p.status==='approved');
   const headers='Fecha,Descripción,Proveedor,Tipo,Categoría,Monto,Referencia,Notas';
@@ -834,6 +907,19 @@ function exportCSV() {
 
 /* ── REPORTS ────────────────────────────────────────────────── */
 function renderReports() {
+  const monthStart = firstDayOfCurrentMonth();
+  const remanente = calcRemanente(monthStart);
+  const thisMonth = DB.payments.filter(p => p.status==='approved' && txLedgerDate(p) >= monthStart);
+  const ingresosMes = thisMonth.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
+  const egresosMes  = thisMonth.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
+  const remanenteSiguiente = remanente + ingresosMes - egresosMes;
+  const summary = document.getElementById('reportSummary');
+  if (summary) summary.innerHTML = `
+    <div class="metric"><div class="metric-label">Remanente mes anterior</div><div class="metric-value" style="color:${remanente>=0?'var(--navy)':'var(--c-red)'}">${fmt(remanente)}</div></div>
+    <div class="metric"><div class="metric-label">Ingresos del mes</div><div class="metric-value">${fmt(ingresosMes)}</div></div>
+    <div class="metric"><div class="metric-label">Egresos del mes</div><div class="metric-value" style="color:var(--c-red)">${fmt(egresosMes)}</div></div>
+    <div class="metric"><div class="metric-label">Remanente para el siguiente mes</div><div class="metric-value" style="color:${remanenteSiguiente>=0?'var(--navy)':'var(--c-red)'}">${fmt(remanenteSiguiente)}</div></div>`;
+
   const tbody = document.getElementById('tblReport');
   if (!tbody) return;
   tbody.innerHTML = DB.residents.map(r=>{

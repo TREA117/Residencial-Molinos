@@ -285,6 +285,10 @@
       <!-- ── REPORTS (admin) ────────────────────────── -->
       <div id="pageReports" class="page">
         <div class="page-header"><div class="page-title">Reportes</div><div class="page-sub">Estado de cobros del mes en curso</div></div>
+        <div class="card" style="margin-bottom:1rem">
+          <div class="card-head"><span class="card-title">Resumen financiero — mes actual</span></div>
+          <div class="metrics" id="reportSummary" style="padding:1rem 1.25rem"></div>
+        </div>
         <div class="card">
           <div class="card-head"><span class="card-title">Estado de cobros — mes actual</span></div>
           <div class="tbl-wrap"><table>
@@ -510,6 +514,10 @@
         <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('expenses')">
           <div style="font-size:13px;font-weight:600;color:var(--navy)">🧾 Importar egresos (xls/csv)</div>
           <div style="font-size:12px;color:var(--mist);margin-top:3px">Columnas: fecha, proveedor, concepto, monto</div>
+        </div>
+        <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('incomes')">
+          <div style="font-size:13px;font-weight:600;color:var(--navy)">💰 Importar ingresos (xls/csv)</div>
+          <div style="font-size:12px;color:var(--mist);margin-top:3px">Columnas: fecha, monto</div>
         </div>
       </div>
       <div id="importMethodArea"></div>
