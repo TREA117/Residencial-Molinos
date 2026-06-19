@@ -307,9 +307,23 @@ async function approvePayment(id) {
   }
 
   renderPayments();
-  showReceipt(id); // también genera y sube el PDF del recibo a Supabase Storage (ver updateReceiptDownloadButton)
   updatePendingCounts();
   showToast('✓ Pago aprobado — Recibo '+receiptNum+' generado');
+
+  // Generar y subir el recibo a Storage de inmediato, para que quede
+  // disponible sin depender de que alguien lo abra/descargue manualmente.
+  try {
+    const blob = await generateReceiptImageBlob(p);
+    const url  = await uploadReceiptImage(p, blob);
+    await window.SUPABASE.update('payments', id, { receipt_url: url });
+    p.receiptUrl = url; p.receipt_url = url;
+    if (typeof renderMyPayments === 'function') renderMyPayments();
+    if (typeof renderVouchers === 'function') renderVouchers();
+  } catch(e) {
+    console.warn('No se pudo pre-generar el recibo en Storage', e);
+  }
+
+  showReceipt(id);
 }
 
 async function rejectPayment(id) {
@@ -437,7 +451,7 @@ function viewVoucher(id) {
 
   const buttons = [];
   if (imgUrl) buttons.push(`<button class="btn btn-secondary" id="btnDownloadVoucher">⬇ Descargar</button>`);
-  if (p.status === 'pending') {
+  if (p.status === 'pending' && currentUser?.role === 'admin') {
     buttons.push(`<button class="btn btn-danger btn-sm" onclick="rejectPayment(${id});closeModal('modalViewVoucher')">✕ Rechazar</button>`);
     buttons.push(`<button class="btn btn-gold" onclick="approvePayment(${id});closeModal('modalViewVoucher')">✓ Aprobar y generar recibo</button>`);
   }
