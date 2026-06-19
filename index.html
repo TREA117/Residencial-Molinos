@@ -274,7 +274,7 @@
             </div>
           </div>
           <div class="tbl-wrap"><table>
-            <thead><tr><th>Fecha</th><th>Proveedor</th><th>Concepto</th><th>Categoría</th><th>Tipo</th><th>Monto</th><th>Referencia</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Proveedor</th><th>Concepto</th><th>Tipo</th><th>Monto</th><th>Referencia</th><th>Acciones</th></tr></thead>
             <tbody id="tblFinances"></tbody>
           </table></div>
         </div>
@@ -391,6 +391,36 @@
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modalTransaction')">Cancelar</button>
       <button class="btn btn-gold" onclick="saveTransaction()">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Transaction -->
+<div class="modal-overlay" id="modalEditTransaction">
+  <div class="modal">
+    <div class="modal-head"><span class="modal-title">Editar transacción</span><button class="modal-close" onclick="closeModal('modalEditTransaction')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="editTransId">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Fecha</label><input type="date" id="editTransDate"></div>
+        <div class="field"><label>Tipo</label>
+          <select id="editTransType"><option value="income">Ingreso</option><option value="expense">Egreso</option></select>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Proveedor</label><input type="text" id="editTransProvider" placeholder="(opcional)"></div>
+        <div class="field"><label>Monto (MXN)</label><input type="number" id="editTransAmount" step="0.01"></div>
+      </div>
+      <div class="field"><label>Concepto</label><input type="text" id="editTransDesc"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Categoría</label><input type="text" id="editTransCat" placeholder="(opcional)"></div>
+        <div class="field"><label>Referencia / Factura</label><input type="text" id="editTransRef" placeholder="(opcional)"></div>
+      </div>
+      <div class="field"><label>Notas (opcional)</label><textarea id="editTransNotes"></textarea></div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modalEditTransaction')">Cancelar</button>
+      <button class="btn btn-gold" onclick="saveEditTransaction()">Guardar cambios</button>
     </div>
   </div>
 </div>

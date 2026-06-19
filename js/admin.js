@@ -671,15 +671,63 @@ function renderFinances() {
     const isResident = !!(p.residentId||p.resident_id);
     const concepto  = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
     const proveedor = p.provider || (isResident ? (p.residentName||p.resident_name||'—') : '—');
-    const cat  = p.category || (isResident ? 'Mantenimiento' : '—');
     const ref  = p.reference || p.receiptNum || p.receipt_num || '—';
     return `<tr>
-    <td>${fmtDate(txDate(p))}</td><td>${proveedor}</td><td>${concepto}</td><td>${cat}</td>
+    <td>${fmtDate(txDate(p))}</td><td>${proveedor}</td><td>${concepto}</td>
     <td><span class="badge ${p.type==='income'?'badge-income':'badge-expense'}">${p.type==='income'?'Ingreso':'Egreso'}</span></td>
     <td style="font-weight:500;color:${p.type==='income'?'var(--navy)':'var(--c-red)'}">${p.type==='income'?'+':'−'}${fmt(p.amount)}</td>
     <td style="color:var(--mist)">${ref}</td>
-    <td><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">Eliminar</button></td>
-  </tr>`;}).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--mist);padding:1.5rem">Sin transacciones</td></tr>';
+    <td style="display:flex;gap:4px">
+      <button class="btn btn-secondary btn-sm" onclick="editTransactionModal(${p.id})">Editar</button>
+      <button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">Eliminar</button>
+    </td>
+  </tr>`;}).join('')||'<tr><td colspan="7" style="text-align:center;color:var(--mist);padding:1.5rem">Sin transacciones</td></tr>';
+}
+
+function editTransactionModal(id) {
+  const p = DB.payments.find(p=>p.id===id);
+  if (!p) return;
+  const isResident = !!(p.residentId||p.resident_id);
+  document.getElementById('editTransId').value       = p.id;
+  document.getElementById('editTransDate').value     = p.approvedDate||p.approved_date||p.paymentDate||p.payment_date||'';
+  document.getElementById('editTransType').value     = p.type==='expense' ? 'expense' : 'income';
+  document.getElementById('editTransProvider').value = p.provider || '';
+  document.getElementById('editTransAmount').value   = p.amount || '';
+  document.getElementById('editTransDesc').value     = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '');
+  document.getElementById('editTransCat').value      = p.category || '';
+  document.getElementById('editTransRef').value      = p.reference || '';
+  document.getElementById('editTransNotes').value    = p.notes || '';
+  openModal('modalEditTransaction');
+}
+
+async function saveEditTransaction() {
+  const id     = Number(document.getElementById('editTransId').value);
+  const p      = DB.payments.find(p=>p.id===id);
+  if (!p) return;
+  const date     = document.getElementById('editTransDate').value;
+  const type     = document.getElementById('editTransType').value;
+  const provider = document.getElementById('editTransProvider').value.trim();
+  const amount   = parseFloat(document.getElementById('editTransAmount').value);
+  const desc     = document.getElementById('editTransDesc').value.trim();
+  const cat      = document.getElementById('editTransCat').value.trim();
+  const ref      = document.getElementById('editTransRef').value.trim();
+  const notes    = document.getElementById('editTransNotes').value.trim();
+  if (!date||!amount||!desc) { showToast('Completa fecha, monto y concepto','error'); return; }
+
+  const updates = {
+    type, amount, description:desc, category:cat, provider, reference:ref, notes,
+    approved_date: date
+  };
+  try {
+    await window.SUPABASE.update('payments', id, updates);
+    Object.assign(p, updates, { approvedDate:date });
+  } catch(e) {
+    console.error('No se pudo guardar la transacción', e);
+    showToast('Error al guardar: '+(e?.message||e),'error');
+    return;
+  }
+  closeModal('modalEditTransaction'); renderFinances(); renderDashboard();
+  showToast('✓ Transacción actualizada');
 }
 
 function openModalTransaction(type) {
