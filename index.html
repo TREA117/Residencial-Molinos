@@ -503,21 +503,22 @@
         <div class="csv-desc">Selecciona el método para cargar transacciones masivas</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:1.25rem">
-        <div class="card" style="padding:12px;cursor:pointer;border:2px solid var(--gold)" onclick="selectImportMethod('csv')">
-          <div style="font-size:13px;font-weight:600;color:var(--navy)">📄 Archivo CSV</div>
-          <div style="font-size:12px;color:var(--mist);margin-top:3px">Columnas: fecha, descripcion, tipo, monto, categoria, referencia</div>
-        </div>
-        <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('paste')">
-          <div style="font-size:13px;font-weight:600;color:var(--navy)">📋 Pegar desde Excel</div>
-          <div style="font-size:12px;color:var(--mist);margin-top:3px">Copia y pega filas separadas por tabulador</div>
-        </div>
-        <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('expenses')">
+        <div class="card" style="padding:12px;cursor:pointer;border:2px solid var(--gold)" onclick="selectImportMethod('expenses')">
           <div style="font-size:13px;font-weight:600;color:var(--navy)">🧾 Importar egresos (xls/csv)</div>
           <div style="font-size:12px;color:var(--mist);margin-top:3px">Columnas: fecha, proveedor, concepto, monto</div>
         </div>
-        <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('incomes')">
+        <div class="card" style="padding:12px;cursor:pointer;border:2px solid var(--gold)" onclick="selectImportMethod('incomes')">
           <div style="font-size:13px;font-weight:600;color:var(--navy)">💰 Importar ingresos (xls/csv)</div>
           <div style="font-size:12px;color:var(--mist);margin-top:3px">Columnas: fecha, monto</div>
+        </div>
+        <div style="border-top:1px solid var(--c-border);margin:4px 0;padding-top:10px;font-size:11px;color:var(--mist)">Formato genérico (avanzado, requiere columna "tipo" con income/expense exactos):</div>
+        <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('csv')">
+          <div style="font-size:13px;font-weight:600;color:var(--navy)">📄 Archivo CSV genérico</div>
+          <div style="font-size:12px;color:var(--mist);margin-top:3px">Columnas: fecha, descripcion, tipo, monto, categoria, referencia</div>
+        </div>
+        <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('paste')">
+          <div style="font-size:13px;font-weight:600;color:var(--navy)">📋 Pegar desde Excel (genérico)</div>
+          <div style="font-size:12px;color:var(--mist);margin-top:3px">Copia y pega filas separadas por tabulador</div>
         </div>
       </div>
       <div id="importMethodArea"></div>

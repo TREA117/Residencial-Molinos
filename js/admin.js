@@ -799,12 +799,13 @@ async function doImport() {
     showToast('Pega datos o selecciona un archivo','error'); return;
   }
 
-  let imported = 0;
+  let imported = 0, failed = 0;
   for (const line of lines) {
     if (!line.trim()) continue;
     const [date,desc,type,amount,cat,ref] = parseDelimitedRow(line, delim);
-    if (date&&desc&&type&&amount) {
-      const rec = { type:type.trim(), date:date.trim(), amount:parseFloat(amount)||0,
+    const parsedAmount = parseFloat(amount);
+    if (date&&desc&&type&&parsedAmount) {
+      const rec = { type:type.trim(), date:date.trim(), amount:parsedAmount,
         description:desc.trim(), category:cat?.trim()||'Otros', reference:ref?.trim()||'', notes:'' };
       try {
         const sb = window.SUPABASE;
@@ -812,11 +813,11 @@ async function doImport() {
         const row = Array.isArray(rows) ? rows[0] : rows;
         if (row) DB.payments.push(normalizePayment(row));
         imported++;
-      } catch(e) { console.error('Import row failed', e); }
-    }
+      } catch(e) { console.error('Import row failed', e); failed++; }
+    } else failed++;
   }
   closeModal('modalImport'); renderFinances(); renderDashboard();
-  showToast(imported+' transacciones importadas ✓');
+  showToast(`${imported} transacciones importadas${failed?` (${failed} filas con error/encabezado omitidas)`:''} ✓`);
 }
 
 async function doImportExpenses() {
