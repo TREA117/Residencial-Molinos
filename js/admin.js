@@ -711,32 +711,14 @@ async function saveTransaction() {
 }
 
 /* ── IMPORT CSV ─────────────────────────────────────────────── */
-function openModalImport() { openModal('modalImport'); }
-function selectImportMethod(m) {
-  const area=document.getElementById('importMethodArea');
-  const btn=document.getElementById('btnDoImport');
-  area.dataset.mode = m;
-  if (m==='csv') {
-    area.innerHTML='<div class="field"><label>Archivo CSV</label><div class="upload-zone" onclick="document.getElementById(\'csvFile\').click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;margin:0 auto 6px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div>Seleccionar .csv</div><div style="font-size:11px;color:var(--mist);margin-top:4px">fecha, descripcion, tipo, monto, categoria, referencia</div></div><input type="file" id="csvFile" accept=".csv" style="display:none"></div>';
-    btn.style.display='inline-flex';
-  } else if (m==='paste') {
-    area.innerHTML='<div class="field"><label>Pegar desde Excel (Tab separado)</label><textarea id="pasteData" placeholder="2026-06-01\tCuota depto 10H\tincome\t1500\tMantenimiento" style="height:120px;font-family:monospace;font-size:12px"></textarea></div>';
-    btn.style.display='inline-flex';
-  } else if (m==='transactions') {
-    area.innerHTML = `
-      <div class="field"><label>Archivo CSV (fecha, tipo, proveedor, concepto, monto)</label>
-        <div class="upload-zone" onclick="document.getElementById('txFile').click()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;margin:0 auto 6px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <div id="txFileLabel">Seleccionar .csv</div>
-          <div style="font-size:11px;color:var(--mist);margin-top:4px">fecha (AAAA-MM-DD), tipo (ingreso/egreso), proveedor, concepto, monto</div>
-        </div>
-        <input type="file" id="txFile" accept=".csv" style="display:none" onchange="document.getElementById('txFileLabel').textContent=this.files[0]?.name||'Seleccionar .csv'">
-      </div>
-      <div class="field"><label>O pega desde Excel (Tab separado)</label>
-        <textarea id="txPaste" placeholder="2026-06-01	egreso	Proveedor SA	Compra de material de limpieza	1500.00" style="height:100px;font-family:monospace;font-size:12px"></textarea>
-      </div>`;
-    btn.style.display='inline-flex';
-  }
+function openModalImport() {
+  const fileEl = document.getElementById('txFile');
+  const pasteEl = document.getElementById('txPaste');
+  const labelEl = document.getElementById('txFileLabel');
+  if (fileEl) fileEl.value = '';
+  if (pasteEl) pasteEl.value = '';
+  if (labelEl) labelEl.textContent = 'Seleccionar .csv';
+  openModal('modalImport');
 }
 
 function normalizeImportType(raw) {
@@ -773,43 +755,6 @@ function normalizeImportDate(raw) {
   if (dmy) { const [,d,m,y] = dmy; return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; }
   const parsed = new Date(raw);
   return isNaN(parsed) ? '' : parsed.toISOString().split('T')[0];
-}
-
-async function doImport() {
-  const area = document.getElementById('importMethodArea');
-  if (area?.dataset.mode === 'transactions') return doImportTransactions();
-
-  const csvFileEl = document.getElementById('csvFile');
-  const pasteEl    = document.getElementById('pasteData');
-  let lines, delim;
-  if (csvFileEl?.files?.[0]) {
-    const text = await csvFileEl.files[0].text();
-    lines = text.trim().split('\n'); delim = ',';
-  } else if (pasteEl?.value.trim()) {
-    lines = pasteEl.value.trim().split('\n'); delim = '\t';
-  } else {
-    showToast('Pega datos o selecciona un archivo','error'); return;
-  }
-
-  let imported = 0, failed = 0;
-  for (const line of lines) {
-    if (!line.trim()) continue;
-    const [date,desc,type,amount,cat,ref] = parseDelimitedRow(line, delim);
-    const parsedAmount = parseFloat(amount);
-    if (date&&desc&&type&&parsedAmount) {
-      const rec = { type:type.trim(), date:date.trim(), amount:parsedAmount,
-        description:desc.trim(), category:cat?.trim()||'Otros', reference:ref?.trim()||'', notes:'' };
-      try {
-        const sb = window.SUPABASE;
-        const rows = await sb.insert('payments', toDbTransaction(rec));
-        const row = Array.isArray(rows) ? rows[0] : rows;
-        if (row) DB.payments.push(normalizePayment(row));
-        imported++;
-      } catch(e) { console.error('Import row failed', e); failed++; }
-    } else failed++;
-  }
-  closeModal('modalImport'); renderFinances(); renderDashboard();
-  showToast(`${imported} transacciones importadas${failed?` (${failed} filas con error/encabezado omitidas)`:''} ✓`);
 }
 
 async function doImportTransactions() {
