@@ -154,7 +154,7 @@ function editResidentModal(id) {
   document.getElementById('editResEmail').value = r.email ||'';
   document.getElementById('editResPhone').value = r.phone ||'';
   document.getElementById('editResDepto').value = r.depto ||'';
-  document.getElementById('editResFee').value   = r.fee   ||1500;
+  document.getElementById('editResFee').value   = r.fee   ||DB.settings?.defaultFee||400;
   document.getElementById('editResStatus').value= r.status||'pending';
   openModal('modalEditResident');
 }
@@ -167,7 +167,7 @@ async function saveEditResident() {
   const email  = document.getElementById('editResEmail').value.trim();
   const phone  = document.getElementById('editResPhone').value.trim();
   const depto  = document.getElementById('editResDepto').value.trim().toUpperCase().replace(/\s+/g,'');
-  const fee    = parseFloat(document.getElementById('editResFee').value)||1500;
+  const fee    = parseFloat(document.getElementById('editResFee').value)||DB.settings?.defaultFee||400;
   const status = document.getElementById('editResStatus').value;
   try {
     await window.SUPABASE.update('users', id, { name, email, phone, depto, fee, depto_status: status });
@@ -183,7 +183,7 @@ async function saveEditResident() {
 
 function openModalAddResident() {
   ['newResName','newResEmail','newResPhone','newResDepto'].forEach(i=>{const el=document.getElementById(i);if(el)el.value='';});
-  const fee=document.getElementById('newResFee'); if(fee) fee.value='1500';
+  const fee=document.getElementById('newResFee'); if(fee) fee.value=DB.settings?.defaultFee||400;
   openModal('modalAddResident');
 }
 async function saveNewResident() {
@@ -191,7 +191,7 @@ async function saveNewResident() {
   const email  = document.getElementById('newResEmail').value.trim();
   const phone  = document.getElementById('newResPhone').value.trim();
   const depto  = document.getElementById('newResDepto').value.trim().toUpperCase().replace(/\s+/g,'');
-  const fee    = parseFloat(document.getElementById('newResFee').value)||1500;
+  const fee    = parseFloat(document.getElementById('newResFee').value)||DB.settings?.defaultFee||400;
   const status = document.getElementById('newResStatus').value;
   if (!name||!depto) { showToast('Nombre y departamento son requeridos','error'); return; }
   try {
@@ -726,7 +726,7 @@ function renderReports() {
       return (p.month||'').toLowerCase().includes(mn.toLowerCase());
     });
     return `<tr>
-      <td><strong>${r.depto||'—'}</strong></td><td>${r.name}</td><td>${fmt(r.fee||1500)}</td>
+      <td><strong>${r.depto||'—'}</strong></td><td>${r.name}</td><td>${fmt(r.fee||DB.settings?.defaultFee||400)}</td>
       <td><span class="badge ${hasCurrent?'badge-approved':r.status==='approved'?'badge-pending':'badge-rejected'}">${hasCurrent?'Pagado':r.status==='approved'?'Pendiente':'Inactivo'}</span></td>
       <td>${latest?fmtDate(latest.approvedDate||latest.approved_date):'—'}</td>
     </tr>`;
@@ -755,12 +755,19 @@ function renderEditContacts() {
         <div class="field"><label>Teléfono 1</label><input type="tel" id="ec_casetaPhone1" value="${c.caseta.phone1.display}"></div>
         <div class="field"><label>Teléfono 2</label><input type="tel" id="ec_casetaPhone2" value="${c.caseta.phone2.display}"></div>
         <div class="field"><label>WhatsApp</label><input type="tel" id="ec_casetaWA" value="${c.caseta.whatsapp}"></div>
+        <div class="field" style="grid-column:1/-1"><label>Horario</label><input type="text" id="ec_casetaHours" value="${c.caseta.hours||''}" placeholder="Ej. Lun–Dom 8:00–20:00"></div>
+      </div>
+    </div>
+    <div class="card" style="margin-bottom:1rem;padding:1.25rem">
+      <div style="font-size:14px;font-weight:600;color:var(--navy);margin-bottom:1rem">Configuración general</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="field"><label>Cuota mensual por defecto (MXN)</label><input type="number" id="ec_defaultFee" value="${DB.settings?.defaultFee||400}"></div>
       </div>
     </div>
     <button class="btn btn-gold" onclick="saveContacts()">Guardar contactos</button>`;
 }
 
-function saveContacts() {
+async function saveContacts() {
   const c = DB.contacts;
   c.admin.phone1.display = document.getElementById('ec_adminPhone1').value;
   c.admin.phone1.number  = c.admin.phone1.display.replace(/[\s\-\(\)]/g,'');
@@ -774,5 +781,19 @@ function saveContacts() {
   c.caseta.phone2.display= document.getElementById('ec_casetaPhone2').value;
   c.caseta.phone2.number = c.caseta.phone2.display.replace(/[\s\-\(\)]/g,'');
   c.caseta.whatsapp      = document.getElementById('ec_casetaWA').value;
-  showToast('✓ Contactos actualizados');
+  c.caseta.hours          = document.getElementById('ec_casetaHours').value;
+  DB.settings.defaultFee = parseFloat(document.getElementById('ec_defaultFee').value) || 400;
+
+  try {
+    const client = window.SUPABASE?.client?.();
+    if (!client) throw new Error('Sin conexión con Supabase');
+    const { error } = await client.from('settings').upsert({
+      id: 1, contacts: c, default_fee: DB.settings.defaultFee, updated_at: new Date().toISOString()
+    });
+    if (error) throw error;
+    showToast('✓ Contactos actualizados y guardados');
+  } catch(e) {
+    console.error('No se pudo guardar la configuración en Supabase', e);
+    showToast('Se actualizó en pantalla, pero no se pudo guardar permanentemente (¿falta la tabla "settings"?)', 'error');
+  }
 }

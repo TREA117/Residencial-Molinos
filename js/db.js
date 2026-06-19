@@ -22,14 +22,15 @@ const DB = {
       phone1: { number: '+525511112222', label: 'Línea directa caseta', display: '+52 55 1111 2222' },
       phone2: { number: '+525533334444', label: 'Celular guardia', display: '+52 55 3333 4444' },
       whatsapp: '+525533334444',
-      hours: 'Servicio activo las 24 horas, los 365 días'
+      hours: ''
     },
     emergency: [
-      { label: '911',              number: '911',           desc: 'Emergencias',     color: 'red' },
-      { label: '080',              number: '080',           desc: 'Bomberos',         color: 'blue' },
-      { label: '+52 55 5555 5555', number: '+525555555555', desc: 'Plomería urgente', color: 'green' },
-      { label: '+52 55 6666 7777', number: '+525566667777', desc: 'Electricidad',     color: 'amber' }
+      { label: '911', number: '911', desc: 'Emergencias', color: 'red' },
+      { label: '080', number: '080', desc: 'Bomberos',    color: 'blue' }
     ]
+  },
+  settings: {
+    defaultFee: 400
   },
   nextId: 100
 };

@@ -59,15 +59,22 @@ async function loadDB() {
     return;
   }
   try {
-    const [users, payments, notifications] = await Promise.all([
+    const [users, payments, notifications, settingsRows] = await Promise.all([
       sb.list('users'),
       sb.list('payments'),
       sb.list('notifications').catch(e => { console.warn('Tabla notifications no disponible', e); return []; }),
+      sb.list('settings').catch(e => { console.warn('Tabla settings no disponible (corre la migración SQL)', e); return []; }),
     ]);
     DB.users         = (users         || []).map(normalizeUser);
     DB.payments      = (payments      || []).map(normalizePayment);
     DB.notifications = (notifications || []).map(normalizeNotification);
     syncResidentsFromUsers();
+
+    const settingsRow = Array.isArray(settingsRows) && settingsRows.find(s => s.id === 1);
+    if (settingsRow) {
+      if (settingsRow.contacts && Object.keys(settingsRow.contacts).length) DB.contacts = settingsRow.contacts;
+      if (settingsRow.default_fee != null) DB.settings.defaultFee = settingsRow.default_fee;
+    }
 
     const maxId = Math.max(1,
       ...DB.users.map(u => Number(u.id)||0),

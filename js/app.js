@@ -79,7 +79,7 @@ function checkPaymentBanner() {
     const res = DB.residents.find(r =>
       r.userId === currentUser.id || r.user_id === currentUser.id || r.email === currentUser.email
     );
-    const fee = res?.fee || currentUser.fee || 1500;
+    const fee = res?.fee || currentUser.fee || DB.settings?.defaultFee || 400;
     const monthName = today.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
     banner.classList.remove('hidden');
     banner.innerHTML = `
@@ -106,7 +106,7 @@ function renderMyPayments() {
   );
   const depto  = res?.depto  || currentUser.depto  || '—';
   const status = res?.status || currentUser.deptoStatus || currentUser.depto_status || (currentUser.depto ? 'approved' : 'pending');
-  const fee    = res?.fee    || currentUser.fee    || 1500;
+  const fee    = res?.fee    || currentUser.fee    || DB.settings?.defaultFee || 400;
 
   const deptoNumEl    = document.getElementById('resDeptoNum');
   const deptoStatusEl = document.getElementById('resDeptoStatus');
@@ -186,7 +186,7 @@ function renderMyAccount() {
   const pending  = myPays.filter(p => p.status === 'pending');
   const rejected = myPays.filter(p => p.status === 'rejected');
   const totalPaid = approved.reduce((s,p) => s + Number(p.amount||0), 0);
-  const fee = currentUser.fee || 1500;
+  const fee = currentUser.fee || DB.settings?.defaultFee || 400;
 
   const area = document.getElementById('accountArea');
   if (!area) return;
@@ -344,7 +344,7 @@ function buildReceiptHTML(p) {
 
   return `
     <div class="receipt">
-      <img src="assets/LogoM3.jpg" alt="" class="receipt-watermark" onerror="this.style.display='none'">
+      <img src="assets/LogoM3.svg" alt="" class="receipt-watermark" onerror="this.style.display='none'">
       <div class="receipt-content">
         <div class="receipt-header">
           <div>
@@ -437,20 +437,25 @@ function waitForImages(container) {
   })));
 }
 
-/* Convierte el logo a data URL una sola vez (se reusa en cada recibo).
-   html2canvas es poco confiable con <img src> remotos/SVG; incrustar el
-   raster como data: URI elimina por completo la dependencia de red. */
+/* Rasteriza el logo SVG a un PNG (data URL) una sola vez, conservando la
+   transparencia — html2canvas es poco confiable con <img src> apuntando
+   directo a un SVG, pero un PNG ya rasterizado y embebido como data: URI
+   lo captura sin problema y sin dependencia de red. */
 let __logoDataUrlPromise = null;
 function getLogoDataUrl() {
   if (!__logoDataUrlPromise) {
-    __logoDataUrlPromise = fetch('assets/LogoM3.jpg')
-      .then(res => res.blob())
-      .then(blob => new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload  = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      }));
+    __logoDataUrlPromise = new Promise((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width  = img.naturalWidth  || 512;
+        canvas.height = img.naturalHeight || 512;
+        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = 'assets/LogoM3.svg';
+    });
   }
   return __logoDataUrlPromise;
 }

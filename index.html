@@ -37,7 +37,6 @@
         <div class="field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="tu@correo.com"></div>
         <div class="field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
         <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar</button>
-        <p style="font-size:12px;color:var(--mist);text-align:center;margin-top:10px;cursor:pointer" onclick="showOTP()">¿Prefiero código OTP por correo →</p>
 
         <!-- Credenciales de acceso rápido -->
         <div style="margin-top:14px;font-size:12px;color:var(--mist);text-align:center;line-height:2">
@@ -46,27 +45,16 @@
         </div>
       </div>
 
-      <!-- OTP -->
-      <div id="formOTP" class="hidden">
-        <div class="field"><label>Correo o teléfono</label><input type="text" id="otpContact" placeholder="tu@correo.com o +52 555 000 0000"></div>
-        <button class="btn btn-secondary btn-full" onclick="sendOTP()">Enviar código</button>
-        <div id="otpCodeField" class="hidden" style="margin-top:1rem">
-          <div class="field"><label>Código de 6 dígitos</label><input type="text" id="otpCode" placeholder="000000" maxlength="6"></div>
-          <button class="btn btn-primary btn-full" onclick="verifyOTP()">Verificar y entrar</button>
-        </div>
-        <p style="font-size:12px;color:var(--mist);text-align:center;margin-top:10px;cursor:pointer" onclick="switchAuth('login')">← Volver al login</p>
-      </div>
-
       <!-- REGISTER -->
       <div id="formRegister" class="hidden">
         <div class="field"><label>Nombre completo</label><input type="text" id="regName" placeholder="Juan García Pérez"></div>
         <div class="field"><label>Correo electrónico</label><input type="email" id="regEmail" placeholder="tu@correo.com"></div>
-        <div class="field"><label>Número de celular</label><input type="tel" id="regPhone" placeholder="+52 555 000 0000"></div>
+        <div class="field"><label>Número de celular</label><input type="tel" id="regPhone" placeholder="555 000 0000"></div>
         <div class="field">
           <label>Número de departamento</label>
           <input type="text" id="regDepto" placeholder="10H" style="text-transform:uppercase"
                  oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')">
-          <div class="field-hint">⚠️ Escribe tu departamento en MAYÚSCULAS y SIN ESPACIOS. Ejemplo: 10H, 3B, 201</div>
+          <div class="field-hint">⚠️ Escribe tu departamento en MAYÚSCULAS y SIN ESPACIOS. Ejemplo: 10H, 7E, 2B</div>
         </div>
         <div class="field"><label>Contraseña</label><input type="password" id="regPass" placeholder="Mínimo 8 caracteres"></div>
         <button class="btn btn-primary btn-full" onclick="doRegister()">Solicitar acceso</button>
@@ -91,13 +79,12 @@
      MAIN APP
      ═══════════════════════════════════════════════════════════ -->
 <div id="appScreen" class="hidden">
+  <img src="assets/LogoM3.svg" alt="" class="app-watermark">
   <div class="app">
 
     <!-- SIDEBAR -->
     <div class="sidebar">
       <div class="sidebar-logo-wrap">
-        <img src="assets/LogoM3.svg" alt="RM3" class="sidebar-logo-img"
-             onerror="this.src='assets/LogoM3.jpg';this.onerror=null;">
         <div>
           <div class="sidebar-logo-text">Real Molinos 3</div>
           <div class="sidebar-logo-sub">PRIVADA</div>
@@ -450,10 +437,10 @@
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="field"><label>Correo</label><input type="email" id="newResEmail" placeholder="juan@correo.com"></div>
-        <div class="field"><label>Teléfono</label><input type="tel" id="newResPhone" placeholder="+52 555 000 0000"></div>
+        <div class="field"><label>Teléfono</label><input type="tel" id="newResPhone" placeholder="555 000 0000"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Cuota mensual (MXN)</label><input type="number" id="newResFee" placeholder="1500" value="1500"></div>
+        <div class="field"><label>Cuota mensual (MXN)</label><input type="number" id="newResFee" placeholder="400" value="400"></div>
         <div class="field"><label>Estado</label>
           <select id="newResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option></select>
         </div>
