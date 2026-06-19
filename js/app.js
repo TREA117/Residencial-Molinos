@@ -437,27 +437,38 @@ function waitForImages(container) {
   })));
 }
 
-/* Rasteriza el logo SVG a un PNG (data URL) una sola vez, conservando la
-   transparencia — html2canvas es poco confiable con <img src> apuntando
-   directo a un SVG, pero un PNG ya rasterizado y embebido como data: URI
-   lo captura sin problema y sin dependencia de red. */
-let __logoDataUrlPromise = null;
-function getLogoDataUrl() {
-  if (!__logoDataUrlPromise) {
-    __logoDataUrlPromise = new Promise((resolve, reject) => {
+/* Tamaño intrínseco real del SVG (su viewBox) — un <img> apuntando a un SVG
+   sin atributos width/height propios reporta naturalWidth/Height = 300x150
+   (el tamaño de reemplazo por defecto del navegador), NO el del viewBox.
+   Usar ese valor falso producía un PNG de baja resolución y con relación de
+   aspecto incorrecta: de ahí salía pixelado y descentrado al capturarlo. */
+const LOGO_SRC_W = 800, LOGO_SRC_H = 600;
+
+/* Rasteriza el logo a un PNG ya centrado y "contenido" dentro de un cuadro
+   de boxW×boxH (a una resolución varias veces mayor para que quede nítido),
+   para no depender de que html2canvas soporte bien object-fit/centrado. */
+const __logoDataUrlCache = {};
+function getLogoDataUrl(boxW, boxH) {
+  const key = Math.round(boxW) + 'x' + Math.round(boxH);
+  if (!__logoDataUrlCache[key]) {
+    __logoDataUrlCache[key] = new Promise((resolve, reject) => {
       const img = new Image();
       img.onload = () => {
+        const supersample = 3;
         const canvas = document.createElement('canvas');
-        canvas.width  = img.naturalWidth  || 512;
-        canvas.height = img.naturalHeight || 512;
-        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.width  = Math.round(boxW * supersample);
+        canvas.height = Math.round(boxH * supersample);
+        const scale = Math.min(canvas.width / LOGO_SRC_W, canvas.height / LOGO_SRC_H);
+        const drawW = LOGO_SRC_W * scale, drawH = LOGO_SRC_H * scale;
+        const dx = (canvas.width - drawW) / 2, dy = (canvas.height - drawH) / 2;
+        canvas.getContext('2d').drawImage(img, dx, dy, drawW, drawH);
         resolve(canvas.toDataURL('image/png'));
       };
       img.onerror = reject;
       img.src = 'assets/LogoM3.svg';
     });
   }
-  return __logoDataUrlPromise;
+  return __logoDataUrlCache[key];
 }
 
 /* Renderiza el recibo a una imagen JPEG comprimida (peso mínimo) */
@@ -473,8 +484,11 @@ async function generateReceiptImageBlob(p) {
   try {
     const watermark = container.querySelector('.receipt-watermark');
     if (watermark) {
-      try { watermark.src = await getLogoDataUrl(); }
-      catch(e) { console.warn('No se pudo incrustar la marca de agua', e); }
+      try {
+        const rect = watermark.getBoundingClientRect();
+        watermark.src = await getLogoDataUrl(rect.width || 400, rect.height || 400);
+        watermark.style.objectFit = 'fill'; // ya viene centrado/contenido en el PNG
+      } catch(e) { console.warn('No se pudo incrustar la marca de agua', e); }
     }
     await waitForImages(container);
     const canvas = await html2canvas(container, { scale: 1.5, backgroundColor: '#ffffff', useCORS: true });

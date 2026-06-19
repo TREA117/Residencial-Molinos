@@ -3,8 +3,24 @@
    ================================================================ */
 
 /* ── DASHBOARD ─────────────────────────────────────────────── */
+/* Filtro de fecha compartido por Dashboard e Ingresos/Egresos:
+   from/to vacíos = sin límite en ese extremo. */
+function inDateRange(dateStr, from, to) {
+  if (!dateStr) return false;
+  if (from && dateStr < from) return false;
+  if (to   && dateStr > to)   return false;
+  return true;
+}
+
 function renderDashboard() {
-  const approved      = DB.payments.filter(p=>p.status==='approved');
+  const from = document.getElementById('dashFrom')?.value || '';
+  const to   = document.getElementById('dashTo')?.value   || '';
+  const hasFilter = !!(from || to);
+
+  const approvedAll = DB.payments.filter(p=>p.status==='approved');
+  const approved    = hasFilter
+    ? approvedAll.filter(p => inDateRange(p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'', from, to))
+    : approvedAll;
   const totalIncome    = approved.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalExpense   = approved.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
   const balance        = totalIncome - totalExpense;
@@ -14,21 +30,24 @@ function renderDashboard() {
 
   const area = document.getElementById('metricsArea');
   if (area) area.innerHTML = `
-    <div class="metric"><div class="metric-label">Balance total</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div><div class="metric-change">Ingresos − Egresos</div></div>
-    <div class="metric"><div class="metric-label">Ingresos totales</div><div class="metric-value">${fmt(totalIncome)}</div><div class="metric-change up">↑ acumulado</div></div>
-    <div class="metric"><div class="metric-label">Egresos totales</div><div class="metric-value">${fmt(totalExpense)}</div><div class="metric-change down">↓ acumulado</div></div>
+    <div class="metric"><div class="metric-label">Balance${hasFilter?' (filtrado)':' total'}</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div><div class="metric-change">Ingresos − Egresos</div></div>
+    <div class="metric"><div class="metric-label">Ingresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalIncome)}</div><div class="metric-change up">↑ acumulado</div></div>
+    <div class="metric"><div class="metric-label">Egresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalExpense)}</div><div class="metric-change down">↓ acumulado</div></div>
     <div class="metric"><div class="metric-label">Residentes activos</div><div class="metric-value">${approvedRes}</div><div class="metric-change">${pendingRes} pendientes de auth</div></div>
     <div class="metric"><div class="metric-label">Comprobantes</div><div class="metric-value" style="color:var(--c-amber)">${pendingPay}</div><div class="metric-change">por revisar</div></div>`;
 
-  renderCharts();
+  renderCharts(approved);
 
-  const all = DB.payments.map(p=>{
-    const isResident = !!(p.residentId||p.resident_id);
-    const desc = p.description || (isResident ? 'Pago '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
-    const date = p.approvedDate||p.approved_date||p.sentDate||p.sent_date;
-    const dispType = p.status==='pending' ? 'payment' : (p.status==='rejected' ? 'payment' : p.type);
-    return { date, desc, type:dispType, amount:p.amount, status:p.status };
-  });
+  const all = DB.payments
+    .filter(p => !hasFilter || inDateRange(p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'', from, to))
+    .map(p=>{
+      const isResident = !!(p.residentId||p.resident_id);
+      const descBase = p.description || (isResident ? 'Pago '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
+      const desc = p.provider ? `${p.provider} — ${descBase}` : descBase;
+      const date = p.approvedDate||p.approved_date||p.sentDate||p.sent_date;
+      const dispType = p.status==='pending' ? 'payment' : (p.status==='rejected' ? 'payment' : p.type);
+      return { date, desc, type:dispType, amount:p.amount, status:p.status };
+    });
   all.sort((a,b)=>new Date(b.date)-new Date(a.date));
   const ra = document.getElementById('recentActivity');
   if (ra) ra.innerHTML = all.slice(0,8).map(r=>`<tr>
@@ -39,10 +58,10 @@ function renderDashboard() {
   </tr>`).join('');
 }
 
-function renderCharts() {
+function renderCharts(approved) {
+  approved = approved || DB.payments.filter(p=>p.status==='approved');
   const months  = ['Ene','Feb','Mar','Abr','May','Jun'];
   const mKeys   = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
-  const approved = DB.payments.filter(p=>p.status==='approved');
   const txDate   = p => p.approvedDate||p.approved_date||'';
   const incomes  = mKeys.map(m=>approved.filter(p=>p.type==='income' &&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
   const expenses = mKeys.map(m=>approved.filter(p=>p.type==='expense'&&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
@@ -597,8 +616,15 @@ async function downloadAndCleanup() {
 function renderFinances() {
   const type = document.getElementById('filterFinType')?.value||'';
   const cat  = document.getElementById('filterFinCat')?.value||'';
+  const from = document.getElementById('filterFinFrom')?.value||'';
+  const to   = document.getElementById('filterFinTo')?.value||'';
   const ledger = DB.payments.filter(p=>p.status==='approved');
-  const filtered = ledger.filter(p=>(!type||p.type===type)&&(!cat||(p.category||'')===cat));
+  const txDateFilter = p => p.approvedDate||p.approved_date||p.paymentDate||p.payment_date||'';
+  const filtered = ledger.filter(p=>
+    (!type||p.type===type) &&
+    (!cat||(p.category||'')===cat) &&
+    (!from && !to || inDateRange(txDateFilter(p), from, to))
+  );
   const totalIn  = filtered.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalEx  = filtered.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
   const fm = document.getElementById('finMetrics');
@@ -615,7 +641,8 @@ function renderFinances() {
   const tf = document.getElementById('tblFinances');
   if (tf) tf.innerHTML = filtered.sort((a,b)=>new Date(txDate(b))-new Date(txDate(a))).map(p=>{
     const isResident = !!(p.residentId||p.resident_id);
-    const desc = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
+    const descBase = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
+    const desc = p.provider ? `<strong>${p.provider}</strong> — ${descBase}` : descBase;
     const cat  = p.category || (isResident ? 'Mantenimiento' : '—');
     const ref  = p.reference || p.receiptNum || p.receipt_num || '—';
     return `<tr>
@@ -664,22 +691,79 @@ function openModalImport() { openModal('modalImport'); }
 function selectImportMethod(m) {
   const area=document.getElementById('importMethodArea');
   const btn=document.getElementById('btnDoImport');
+  area.dataset.mode = m;
   if (m==='csv') {
     area.innerHTML='<div class="field"><label>Archivo CSV</label><div class="upload-zone" onclick="document.getElementById(\'csvFile\').click()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;margin:0 auto 6px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg><div>Seleccionar .csv</div><div style="font-size:11px;color:var(--mist);margin-top:4px">fecha, descripcion, tipo, monto, categoria, referencia</div></div><input type="file" id="csvFile" accept=".csv" style="display:none"></div>';
     btn.style.display='inline-flex';
   } else if (m==='paste') {
     area.innerHTML='<div class="field"><label>Pegar desde Excel (Tab separado)</label><textarea id="pasteData" placeholder="2026-06-01\tCuota depto 10H\tincome\t1500\tMantenimiento" style="height:120px;font-family:monospace;font-size:12px"></textarea></div>';
     btn.style.display='inline-flex';
+  } else if (m==='expenses') {
+    area.innerHTML = `
+      <div class="field"><label>Archivo CSV (fecha, proveedor, concepto, monto)</label>
+        <div class="upload-zone" onclick="document.getElementById('expensesFile').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:28px;height:28px;margin:0 auto 6px;display:block"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div id="expensesFileLabel">Seleccionar .csv</div>
+          <div style="font-size:11px;color:var(--mist);margin-top:4px">fecha (AAAA-MM-DD), proveedor, concepto, monto</div>
+        </div>
+        <input type="file" id="expensesFile" accept=".csv" style="display:none" onchange="document.getElementById('expensesFileLabel').textContent=this.files[0]?.name||'Seleccionar .csv'">
+      </div>
+      <div class="field"><label>O pega desde Excel (Tab separado)</label>
+        <textarea id="expensesPaste" placeholder="2026-06-01	Proveedor SA	Compra de material de limpieza	1500.00" style="height:100px;font-family:monospace;font-size:12px"></textarea>
+      </div>`;
+    btn.style.display='inline-flex';
   }
 }
 
+function parseDelimitedRow(line, delim) {
+  if (delim === '\t') return line.split('\t');
+  const out = []; let cur = ''; let inQuotes = false;
+  for (let i=0; i<line.length; i++) {
+    const ch = line[i];
+    if (inQuotes) {
+      if (ch === '"') { if (line[i+1] === '"') { cur += '"'; i++; } else inQuotes = false; }
+      else cur += ch;
+    } else if (ch === '"') inQuotes = true;
+    else if (ch === delim) { out.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  out.push(cur);
+  return out;
+}
+
+function normalizeImportDate(raw) {
+  raw = (raw||'').trim();
+  if (!raw) return '';
+  if (/^\d{4}-\d{1,2}-\d{1,2}$/.test(raw)) {
+    const [y,m,d] = raw.split('-');
+    return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`;
+  }
+  const dmy = raw.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (dmy) { const [,d,m,y] = dmy; return `${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`; }
+  const parsed = new Date(raw);
+  return isNaN(parsed) ? '' : parsed.toISOString().split('T')[0];
+}
+
 async function doImport() {
-  const pasteEl = document.getElementById('pasteData');
-  if (!pasteEl?.value.trim()) { showToast('Pega datos o selecciona un archivo','error'); return; }
-  const lines = pasteEl.value.trim().split('\n');
+  const area = document.getElementById('importMethodArea');
+  if (area?.dataset.mode === 'expenses') return doImportExpenses();
+
+  const csvFileEl = document.getElementById('csvFile');
+  const pasteEl    = document.getElementById('pasteData');
+  let lines, delim;
+  if (csvFileEl?.files?.[0]) {
+    const text = await csvFileEl.files[0].text();
+    lines = text.trim().split('\n'); delim = ',';
+  } else if (pasteEl?.value.trim()) {
+    lines = pasteEl.value.trim().split('\n'); delim = '\t';
+  } else {
+    showToast('Pega datos o selecciona un archivo','error'); return;
+  }
+
   let imported = 0;
   for (const line of lines) {
-    const [date,desc,type,amount,cat,ref] = line.split('\t');
+    if (!line.trim()) continue;
+    const [date,desc,type,amount,cat,ref] = parseDelimitedRow(line, delim);
     if (date&&desc&&type&&amount) {
       const rec = { type:type.trim(), date:date.trim(), amount:parseFloat(amount)||0,
         description:desc.trim(), category:cat?.trim()||'Otros', reference:ref?.trim()||'', notes:'' };
@@ -696,16 +780,50 @@ async function doImport() {
   showToast(imported+' transacciones importadas ✓');
 }
 
+async function doImportExpenses() {
+  const fileEl  = document.getElementById('expensesFile');
+  const pasteEl = document.getElementById('expensesPaste');
+  let lines, delim;
+  if (fileEl?.files?.[0]) {
+    const text = await fileEl.files[0].text();
+    lines = text.trim().split('\n'); delim = ',';
+  } else if (pasteEl?.value.trim()) {
+    lines = pasteEl.value.trim().split('\n'); delim = '\t';
+  } else {
+    showToast('Selecciona un archivo o pega los datos','error'); return;
+  }
+
+  let imported = 0, failed = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (!line.trim()) continue;
+    const [dateRaw, provider, concept, amountRaw] = parseDelimitedRow(line, delim).map(c=>(c||'').trim());
+    const date = normalizeImportDate(dateRaw);
+    if (!date && i === 0) continue; // encabezado (fecha,proveedor,concepto,monto)
+    const amount = parseFloat(String(amountRaw||'').replace(/[^0-9.\-]/g,''));
+    if (!date || !concept || !amount) { failed++; continue; }
+    try {
+      const rec = { type:'expense', date, amount, description:concept, category:'Egresos importados', provider, reference:'', notes:'' };
+      const rows = await window.SUPABASE.insert('payments', toDbTransaction(rec));
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      if (row) DB.payments.push(normalizePayment(row));
+      imported++;
+    } catch(e) { console.error('Import egreso failed', line, e); failed++; }
+  }
+  closeModal('modalImport'); renderFinances(); renderDashboard();
+  showToast(`${imported} egresos importados${failed?` (${failed} con error, revisa formato de fecha/monto)`:''} ✓`, failed && !imported ? 'error' : 'success');
+}
+
 function exportCSV() {
   const ledger = DB.payments.filter(p=>p.status==='approved');
-  const headers='Fecha,Descripción,Tipo,Categoría,Monto,Referencia,Notas';
+  const headers='Fecha,Descripción,Proveedor,Tipo,Categoría,Monto,Referencia,Notas';
   const txDate = p => p.approvedDate||p.approved_date||p.paymentDate||p.payment_date||'';
   const rows = ledger.map(p=>{
     const isResident = !!(p.residentId||p.resident_id);
     const desc = p.description || (isResident ? 'Cuota mantenimiento '+(p.month||'')+' — Depto '+(p.depto||'') : '');
     const cat  = p.category || (isResident ? 'Mantenimiento' : '');
     const ref  = p.reference || p.receiptNum || p.receipt_num || '';
-    return `${txDate(p)},"${desc}",${p.type},${cat},${p.amount},${ref},"${p.notes||''}"`;
+    return `${txDate(p)},"${desc}","${p.provider||''}",${p.type},${cat},${p.amount},${ref},"${p.notes||''}"`;
   });
   const csv=[headers,...rows].join('\n');
   const blob=new Blob([csv],{type:'text/csv'});

@@ -159,9 +159,15 @@
 
       <!-- ── DASHBOARD ──────────────────────────────── -->
       <div id="pageDashboard" class="page active">
-        <div class="page-header">
-          <div class="page-title">Dashboard</div>
-          <div class="page-sub" id="dashWelcome">Bienvenido</div>
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div><div class="page-title">Dashboard</div><div class="page-sub" id="dashWelcome">Bienvenido</div></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <label style="font-size:12px;color:var(--mist)">Desde</label>
+            <input type="date" id="dashFrom" style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderDashboard()">
+            <label style="font-size:12px;color:var(--mist)">Hasta</label>
+            <input type="date" id="dashTo" style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderDashboard()">
+            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('dashFrom').value='';document.getElementById('dashTo').value='';renderDashboard()">Limpiar</button>
+          </div>
         </div>
         <div class="metrics" id="metricsArea"></div>
         <div class="chart-grid">
@@ -258,7 +264,9 @@
         <div class="card">
           <div class="card-head">
             <span class="card-title">Transacciones</span>
-            <div style="display:flex;gap:8px">
+            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+              <input type="date" id="filterFinFrom" title="Desde" style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
+              <input type="date" id="filterFinTo" title="Hasta" style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
               <select id="filterFinType" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFinances()">
                 <option value="">Todo</option><option value="income">Ingresos</option><option value="expense">Egresos</option>
               </select>
@@ -498,6 +506,10 @@
         <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('paste')">
           <div style="font-size:13px;font-weight:600;color:var(--navy)">📋 Pegar desde Excel</div>
           <div style="font-size:12px;color:var(--mist);margin-top:3px">Copia y pega filas separadas por tabulador</div>
+        </div>
+        <div class="card" style="padding:12px;cursor:pointer" onclick="selectImportMethod('expenses')">
+          <div style="font-size:13px;font-weight:600;color:var(--navy)">🧾 Importar egresos (xls/csv)</div>
+          <div style="font-size:12px;color:var(--mist);margin-top:3px">Columnas: fecha, proveedor, concepto, monto</div>
         </div>
       </div>
       <div id="importMethodArea"></div>

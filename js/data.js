@@ -28,6 +28,7 @@ function normalizePayment(p) {
     category:     p.category     || '',
     reference:    p.reference    || '',
     notes:        p.notes        || '',
+    provider:     p.provider     || '',
   };
 }
 function normalizeNotification(n) {
@@ -120,6 +121,7 @@ function toDbTransaction(obj) {
     category:      obj.category    || '',
     reference:     obj.reference   || '',
     notes:         obj.notes       || '',
+    provider:      obj.provider    || '',
     status:        'approved',
     approved_date: obj.date,
     payment_date:  obj.date,
