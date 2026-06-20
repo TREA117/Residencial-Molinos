@@ -429,8 +429,12 @@ async function downloadReceipt(p) {
       .then(newUrl => {
         window.SUPABASE.update('payments', p.id, { receipt_url: newUrl }).catch(()=>{});
         p.receiptUrl = newUrl; p.receipt_url = newUrl;
+        if (typeof renderMyPayments === 'function') renderMyPayments();
       })
-      .catch(e => console.warn('No se pudo guardar el recibo en Storage', e));
+      .catch(e => {
+        console.error('No se pudo guardar el recibo en Storage', e);
+        showToast('El recibo se descargó, pero no se pudo guardar en Storage: '+(e?.message||e), 'error');
+      });
   } catch (e) {
     console.error('No se pudo descargar el recibo', e);
     showToast('No se pudo generar el recibo', 'error');
