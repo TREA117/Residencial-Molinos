@@ -6,7 +6,7 @@
 <title>Real Molinos 3 — Privada</title>
 <link rel="icon" href="assets/LogoM3.svg" type="image/svg+xml">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/styles.css?v=20260620a">
+<link rel="stylesheet" href="css/styles.css?v=20260620b">
 </head>
 <body>
 
@@ -162,23 +162,18 @@
         <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
           <div><div class="page-title">Dashboard</div><div class="page-sub" id="dashWelcome">Bienvenido</div></div>
           <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-            <label style="font-size:12px;color:var(--mist)">Desde</label>
-            <input type="date" id="dashFrom" style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderDashboard()">
-            <label style="font-size:12px;color:var(--mist)">Hasta</label>
-            <input type="date" id="dashTo" style="padding:5px 8px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderDashboard()">
-            <button class="btn btn-secondary btn-sm" onclick="document.getElementById('dashFrom').value='';document.getElementById('dashTo').value='';renderDashboard()">Limpiar</button>
+            <select id="dashMonth" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderDashboard()">
+              <option value="">Todos los meses</option>
+            </select>
           </div>
         </div>
         <div class="metrics" id="metricsArea"></div>
-        <div class="chart-grid">
-          <div class="card">
-            <div class="card-head"><span class="card-title">Flujo mensual</span></div>
-            <div class="card-body"><div class="chart-wrap"><canvas id="chartFlow"></canvas></div></div>
+        <div class="card" style="margin-bottom:1.5rem">
+          <div class="card-head">
+            <span class="card-title">Flujo mensual</span>
+            <select id="chartFlowYear" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderCharts()"></select>
           </div>
-          <div class="card">
-            <div class="card-head"><span class="card-title">Distribución egresos</span></div>
-            <div class="card-body"><div class="chart-wrap"><canvas id="chartDist"></canvas></div></div>
-          </div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="chartFlow"></canvas></div></div>
         </div>
         <div class="card">
           <div class="card-head"><span class="card-title">Actividad reciente</span></div>
@@ -568,11 +563,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
-<script src="js/supabase.js?v=20260620a"></script>
-<script src="js/db.js?v=20260620a"></script>
-<script src="js/data.js?v=20260620a"></script>
-<script src="js/auth.js?v=20260620a"></script>
-<script src="js/app.js?v=20260620a"></script>
-<script src="js/admin.js?v=20260620a"></script>
+<script src="js/supabase.js?v=20260620b"></script>
+<script src="js/db.js?v=20260620b"></script>
+<script src="js/data.js?v=20260620b"></script>
+<script src="js/auth.js?v=20260620b"></script>
+<script src="js/app.js?v=20260620b"></script>
+<script src="js/admin.js?v=20260620b"></script>
 </body>
 </html>

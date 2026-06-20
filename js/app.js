@@ -13,7 +13,7 @@ const fmtDate = d => {
     return date.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
   } catch(e) { return d||'—'; }
 };
-let chartFlow = null, chartDist = null;
+let chartFlow = null;
 
 /* ── DEMO LOGIN HELPER ──────────────────────────────────────── */
 function fillLogin(email, pass) {

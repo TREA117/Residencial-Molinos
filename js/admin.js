@@ -32,36 +32,47 @@ function firstDayOfCurrentMonth() {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
 }
 
+/* Pobla un <select> de meses ('YYYY-MM') a partir de las fechas presentes
+   en `ledger`, más reciente primero — se usa en Dashboard e Ingresos/Egresos. */
+function populateMonthFilter(selectId, ledger, dateFn) {
+  const sel = document.getElementById(selectId);
+  if (!sel || sel.children.length > 1) return;
+  const months = [...new Set(ledger.map(p=>String(dateFn(p)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
+  months.forEach(m=>{
+    const [y,mo] = m.split('-');
+    const label = new Date(+y,+mo-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});
+    const o = document.createElement('option'); o.value=m; o.textContent=label.charAt(0).toUpperCase()+label.slice(1);
+    sel.appendChild(o);
+  });
+}
+
 function renderDashboard() {
-  const from = document.getElementById('dashFrom')?.value || '';
-  const to   = document.getElementById('dashTo')?.value   || '';
-  const hasFilter = !!(from || to);
+  const month = document.getElementById('dashMonth')?.value || '';
+  const hasFilter = !!month;
 
   const approvedAll = DB.payments.filter(p=>p.status==='approved');
   const approved    = hasFilter
-    ? approvedAll.filter(p => inDateRange(p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'', from, to))
+    ? approvedAll.filter(p => String(p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'').startsWith(month))
     : approvedAll;
   const totalIncome    = approved.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalExpense   = approved.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
-  const remanente       = calcRemanente(from || firstDayOfCurrentMonth());
   const balance        = totalIncome - totalExpense;
   const approvedRes    = DB.residents.filter(r=>r.status==='approved').length;
   const pendingRes     = DB.residents.filter(r=>r.status==='pending').length;
-  const pendingPay     = DB.payments.filter(p=>p.status==='pending'&&(p.residentId||p.resident_id)).length;
+
+  populateMonthFilter('dashMonth', approvedAll, p=>p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'');
 
   const area = document.getElementById('metricsArea');
   if (area) area.innerHTML = `
-    <div class="metric"><div class="metric-label">Remanente mes anterior</div><div class="metric-value" style="color:${remanente>=0?'var(--navy)':'var(--c-red)'}">${fmt(remanente)}</div><div class="metric-change">acumulado a la fecha de inicio</div></div>
     <div class="metric"><div class="metric-label">Balance${hasFilter?' (filtrado)':' total'}</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div><div class="metric-change">Ingresos − Egresos</div></div>
     <div class="metric"><div class="metric-label">Ingresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalIncome)}</div><div class="metric-change up">↑ acumulado</div></div>
     <div class="metric"><div class="metric-label">Egresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalExpense)}</div><div class="metric-change down">↓ acumulado</div></div>
-    <div class="metric"><div class="metric-label">Residentes activos</div><div class="metric-value">${approvedRes}</div><div class="metric-change">${pendingRes} pendientes de auth</div></div>
-    <div class="metric"><div class="metric-label">Comprobantes</div><div class="metric-value" style="color:var(--c-amber)">${pendingPay}</div><div class="metric-change">por revisar</div></div>`;
+    <div class="metric"><div class="metric-label">Residentes activos</div><div class="metric-value">${approvedRes}</div><div class="metric-change">${pendingRes} pendientes de auth</div></div>`;
 
-  renderCharts(approved);
+  renderCharts();
 
   const all = DB.payments
-    .filter(p => !hasFilter || inDateRange(p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'', from, to))
+    .filter(p => !hasFilter || String(p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'').startsWith(month))
     .map(p=>{
       const isResident = !!(p.residentId||p.resident_id);
       const descBase = p.description || (isResident ? 'Pago '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
@@ -80,18 +91,30 @@ function renderDashboard() {
   </tr>`).join('');
 }
 
-function renderCharts(approved) {
-  approved = approved || DB.payments.filter(p=>p.status==='approved');
-  const months  = ['Ene','Feb','Mar','Abr','May','Jun'];
-  const mKeys   = ['2026-01','2026-02','2026-03','2026-04','2026-05','2026-06'];
-  const txDate   = p => p.approvedDate||p.approved_date||'';
+function renderCharts() {
+  const approved = DB.payments.filter(p=>p.status==='approved');
+  const txDate = p => p.approvedDate||p.approved_date||'';
+  const years = [...new Set(approved.map(p=>String(txDate(p)).slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort();
+  const currentYear = String(new Date().getFullYear());
+  if (!years.includes(currentYear)) years.push(currentYear);
+  years.sort();
+
+  const yearSel = document.getElementById('chartFlowYear');
+  if (yearSel && yearSel.children.length === 0) {
+    years.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y; yearSel.appendChild(o); });
+    yearSel.value = years.includes(currentYear) ? currentYear : years[years.length-1];
+  }
+  const year = yearSel?.value || currentYear;
+
+  const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const mKeys = monthNames.map((_,i)=>`${year}-${String(i+1).padStart(2,'0')}`);
   const incomes  = mKeys.map(m=>approved.filter(p=>p.type==='income' &&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
   const expenses = mKeys.map(m=>approved.filter(p=>p.type==='expense'&&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
   if (chartFlow) chartFlow.destroy();
   const ctx1 = document.getElementById('chartFlow');
   if (ctx1) chartFlow = new Chart(ctx1, {
     type:'bar',
-    data:{labels:months, datasets:[
+    data:{labels:monthNames, datasets:[
       {label:'Ingresos', data:incomes,  backgroundColor:'rgba(200,154,43,0.3)', borderColor:'var(--gold)', borderWidth:2, borderRadius:4},
       {label:'Egresos',  data:expenses, backgroundColor:'rgba(139,32,32,0.2)',  borderColor:'var(--c-red)',  borderWidth:2, borderRadius:4}
     ]},
@@ -99,15 +122,6 @@ function renderCharts(approved) {
       plugins:{legend:{labels:{font:{size:11}, color:'#3F4750'}}},
       scales:{x:{grid:{display:false}}, y:{grid:{color:'rgba(0,0,0,0.04)'}, ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'k'}}}
     }
-  });
-  const cats = {};
-  approved.filter(p=>p.type==='expense').forEach(p=>{const k=p.category||'Otros'; cats[k]=(cats[k]||0)+Number(p.amount||0);});
-  if (chartDist) chartDist.destroy();
-  const ctx2 = document.getElementById('chartDist');
-  if (ctx2 && Object.keys(cats).length) chartDist = new Chart(ctx2, {
-    type:'doughnut',
-    data:{labels:Object.keys(cats), datasets:[{data:Object.values(cats), backgroundColor:['#C89A2B','#001534','#3F4750','#ACA79D','#E9DFCE','#8B2020'], borderWidth:2, borderColor:'#fff'}]},
-    options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{position:'right', labels:{font:{size:11}, padding:8}}}}
   });
 }
 
@@ -669,16 +683,7 @@ function renderFinances() {
     <div class="metric"><div class="metric-label">Egresos filtrados</div><div class="metric-value" style="color:var(--c-red)">${fmt(totalEx)}</div></div>
     <div class="metric"><div class="metric-label">Balance</div><div class="metric-value" style="color:${totalIn-totalEx>=0?'var(--navy)':'var(--c-red)'}">${fmt(totalIn-totalEx)}</div></div>`;
 
-  const ms = document.getElementById('filterFinMonth');
-  if (ms && ms.children.length<=1) {
-    const months = [...new Set(ledger.map(p=>String(txDateFilter(p)).slice(0,7)).filter(m=>/^\d{4}-\d{2}$/.test(m)))].sort().reverse();
-    months.forEach(m=>{
-      const [y,mo] = m.split('-');
-      const label = new Date(+y,+mo-1,1).toLocaleDateString('es-MX',{month:'long',year:'numeric'});
-      const o = document.createElement('option'); o.value=m; o.textContent=label.charAt(0).toUpperCase()+label.slice(1);
-      ms.appendChild(o);
-    });
-  }
+  populateMonthFilter('filterFinMonth', ledger, txDateFilter);
 
   const txDate = p => p.approvedDate||p.approved_date||p.paymentDate||p.payment_date;
   const tf = document.getElementById('tblFinances');
