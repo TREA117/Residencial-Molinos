@@ -36,7 +36,7 @@ async function goTo(page) {
     const sb = window.SUPABASE;
     if (sb && sb.config && sb.config().hasKey) {
       try {
-        const users = await sb.list('users');
+        const users = await sb.listColumns('users', 'id,name,email,role,phone,depto,depto_status,fee,created_at');
         if (users) {
           DB.users = users.map(u => ({
             ...u,
@@ -88,7 +88,7 @@ function checkPaymentBanner() {
     const res = DB.residents.find(r =>
       r.userId === currentUser.id || r.user_id === currentUser.id || r.email === currentUser.email
     );
-    const fee = DB.settings?.defaultFee || 400;
+    const fee = currentUser.fee || DB.settings?.defaultFee || 400;
     const monthName = today.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
     banner.classList.remove('hidden');
     banner.innerHTML = `
@@ -115,7 +115,7 @@ function renderMyPayments() {
   );
   const depto  = res?.depto  || currentUser.depto  || '—';
   const status = res?.status || currentUser.deptoStatus || currentUser.depto_status || (currentUser.depto ? 'approved' : 'pending');
-  const fee    = DB.settings?.defaultFee || 400;
+  const fee    = currentUser.fee || DB.settings?.defaultFee || 400;
 
   const deptoNumEl    = document.getElementById('resDeptoNum');
   const deptoStatusEl = document.getElementById('resDeptoStatus');
@@ -199,7 +199,7 @@ function renderMyAccount() {
   const pending  = myPays.filter(p => p.status === 'pending');
   const rejected = myPays.filter(p => p.status === 'rejected');
   const totalPaid = approved.reduce((s,p) => s + Number(p.amount||0), 0);
-  const fee = DB.settings?.defaultFee || 400;
+  const fee = currentUser.fee || DB.settings?.defaultFee || 400;
 
   const area = document.getElementById('accountArea');
   if (!area) return;
@@ -228,10 +228,20 @@ function renderMyAccount() {
 }
 
 /* ── UPLOAD VOUCHER (resident) ─────────────────────────────── */
+function populatePayMonthOptions() {
+  const sel = document.getElementById('payMonth');
+  if (!sel) return;
+  const monthNames = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const year = new Date().getFullYear();
+  const currentMonthIdx = new Date().getMonth();
+  sel.innerHTML = monthNames.map((m, i) => `<option ${i===currentMonthIdx?'selected':''}>${m} ${year}</option>`).join('');
+}
+
 function openModalUploadPayment() {
   const res    = DB.residents.find(r => r.userId===currentUser?.id||r.user_id===currentUser?.id||r.email===currentUser?.email);
   const status = res?.status || currentUser?.deptoStatus || currentUser?.depto_status || (currentUser?.depto ? 'approved' : 'pending');
   if (status !== 'approved') { showToast('Tu departamento aún no ha sido verificado', 'error'); return; }
+  populatePayMonthOptions();
   document.getElementById('payAmount').value    = '';
   document.getElementById('payDate').value      = new Date().toISOString().split('T')[0];
   document.getElementById('uploadFileName').textContent = 'Sin archivo seleccionado';
@@ -267,7 +277,9 @@ async function savePayment() {
     const today = new Date();
     const mm    = String(today.getMonth()+1).padStart(2,'0');
     const yyyy  = today.getFullYear();
-    const fileName = `${yyyy}-${mm}-${res.depto}-C_${Date.now()}.${file.name.split('.').pop()}`;
+    const nameParts = file.name.split('.');
+    const ext = nameParts.length > 1 ? nameParts.pop() : 'jpg';
+    const fileName = `${yyyy}-${mm}-${res.depto}-C_${Date.now()}.${ext}`;
     const { error: uploadError } = await client.storage
       .from('comprobantes').upload(fileName, file, { cacheControl:'3600', upsert:false });
     if (uploadError) throw uploadError;
@@ -375,9 +387,8 @@ function buildReceiptHTML(p) {
         <div class="receipt-row"><span class="key">Referencia</span><span>${recNum}</span></div>
         <div class="receipt-total"><span>Total pagado</span><span>${fmt(p.amount)}</span></div>
         <div class="receipt-sig">
-          <div class="receipt-sig-label">Firma de administración</div>
-          <div class="sig-box"><span class="sig-text">Administración RM3</span></div>
-          <div style="font-size:10px;color:var(--mist);margin-top:4px">Real Molinos 3 Privada — Documento oficial de pago</div>
+          <div class="sig-box"><img src="assets/firma-administracion.png" alt="Firma de administración" class="sig-img" onerror="this.style.display='none'"></div>
+          <div class="sig-caption">Administración: Itzel Loredo</div>
         </div>
       </div>
     </div>`;

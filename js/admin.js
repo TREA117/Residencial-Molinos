@@ -17,14 +17,17 @@ function txLedgerDate(p) {
 }
 
 /* Remanente = balance acumulado (ingresos − egresos aprobados) de TODO lo
-   anterior a `beforeDate` (exclusivo, 'YYYY-MM-DD'). Se calcula solo —
-   administración no tiene que escribirlo cada mes — siempre que el
-   histórico de pagos/transacciones esté importado en la tabla payments. */
-function calcRemanente(beforeDate) {
+   anterior a `beforeDate` (exclusivo, 'YYYY-MM-DD'). Se calcula en Postgres
+   (fn_remanente) en vez de sumar sobre DB.payments completo en memoria —
+   evita que Finanzas/Reportes dependan de tener cargado TODO el histórico
+   de pagos para sacar un solo número. */
+async function calcRemanente(beforeDate) {
   if (!beforeDate) return 0;
-  return DB.payments
-    .filter(p => p.status==='approved' && txLedgerDate(p) && txLedgerDate(p) < beforeDate)
-    .reduce((s,p) => s + (p.type==='expense' ? -1 : 1) * Number(p.amount||0), 0);
+  const client = window.SUPABASE?.client?.();
+  if (!client) return 0;
+  const { data, error } = await client.rpc('fn_remanente', { p_before_date: beforeDate });
+  if (error) { console.error('fn_remanente failed', error); return 0; }
+  return Number(data) || 0;
 }
 
 function firstDayOfCurrentMonth() {
@@ -106,8 +109,10 @@ function renderCharts() {
   }
   const year = yearSel?.value || currentYear;
 
-  const monthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const mKeys = monthNames.map((_,i)=>`${year}-${String(i+1).padStart(2,'0')}`);
+  const allMonthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  const startIdx = year === currentYear ? 4 : 0; // este año: arranca en mayo
+  const monthNames = allMonthNames.slice(startIdx);
+  const mKeys = monthNames.map((_,i)=>`${year}-${String(startIdx+i+1).padStart(2,'0')}`);
   const incomes  = mKeys.map(m=>approved.filter(p=>p.type==='income' &&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
   const expenses = mKeys.map(m=>approved.filter(p=>p.type==='expense'&&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
   if (chartFlow) chartFlow.destroy();
@@ -135,31 +140,38 @@ function renderResidents() {
 
   document.getElementById('tblPendingResidents').innerHTML = pending.map(r=>`<tr>
     <td style="font-weight:500">${r.name}</td><td><strong>${r.depto||'—'}</strong></td>
-    <td>${r.email||'—'}</td><td>${r.phone||'—'}</td><td>${fmtDate(new Date())}</td>
+    <td>${r.email||'—'}</td><td>${r.phone||'—'}</td><td>${r.createdAt||r.created_at?fmtDate(r.createdAt||r.created_at):'—'}</td>
     <td style="display:flex;gap:6px">
-      <button class="btn btn-success btn-sm" onclick="approveResident(${r.id})">✓ Autorizar</button>
-      <button class="btn btn-danger btn-sm"  onclick="rejectResident(${r.id})">✕ Rechazar</button>
-    </td></tr>`).join()||'<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin solicitudes pendientes ✓</td></tr>';
+      <button class="btn btn-success btn-sm" onclick="approveResident('${r.id}')">✓ Autorizar</button>
+      <button class="btn btn-danger btn-sm"  onclick="rejectResident('${r.id}')">✕ Rechazar</button>
+    </td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin solicitudes pendientes ✓</td></tr>';
 
   document.getElementById('tblAllResidents').innerHTML = all.map(r=>`<tr>
     <td style="font-weight:500">${r.name}</td><td><strong>${r.depto||'—'}</strong></td>
     <td><span class="badge ${r.status==='approved'?'badge-approved':r.status==='pending'?'badge-pending':'badge-rejected'}">${r.status==='approved'?'Autorizado':r.status==='pending'?'Pendiente':'Rechazado'}</span></td>
     <td>${r.email||'—'}</td><td>${r.phone||'—'}</td>
     <td style="display:flex;gap:6px">
-      <button class="btn btn-secondary btn-sm" onclick="editResidentModal(${r.id})">Editar</button>
-      <button class="btn btn-danger btn-sm"    onclick="deleteResident(${r.id})">Eliminar</button>
-    </td></tr>`).join()||'<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin resultados</td></tr>';
+      <button class="btn btn-secondary btn-sm" onclick="editResidentModal('${r.id}')">Editar</button>
+      <button class="btn btn-danger btn-sm"    onclick="deleteResident('${r.id}')">Eliminar</button>
+    </td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin resultados</td></tr>';
   updatePendingCounts();
 }
 
 async function approveResident(id) {
-  const uid = Number(id);
-  const r = DB.residents.find(r=>Number(r.id)===uid);
+  const r = DB.residents.find(r=>r.id===id);
   if (!r) return;
   try {
-    await window.SUPABASE.update('users', uid, { depto_status: 'approved' });
+    await window.SUPABASE.update('users', id, { depto_status: 'approved' });
+    // "Confirm email" sigue activado en Supabase Auth a propósito — la
+    // confirmación de correo siempre la hace el administrador, al mismo
+    // tiempo que autoriza el depto, no se confirma sola al registrarse.
+    const client = window.SUPABASE?.client?.();
+    if (client) {
+      const { error: confirmError } = await client.rpc('confirm_user_email', { p_user_id: id });
+      if (confirmError) console.warn('No se pudo confirmar el correo automáticamente', confirmError);
+    }
     r.status = 'approved';
-    const u = DB.users.find(u=>Number(u.id)===uid);
+    const u = DB.users.find(u=>u.id===id);
     if (u) { u.depto_status='approved'; u.deptoStatus='approved'; }
     renderResidents();
     showToast('✓ Residente '+r.name+' autorizado — Depto '+r.depto);
@@ -170,13 +182,12 @@ async function approveResident(id) {
 }
 
 async function rejectResident(id) {
-  const uid = Number(id);
-  const r = DB.residents.find(r=>Number(r.id)===uid);
+  const r = DB.residents.find(r=>r.id===id);
   if (!r) return;
   try {
-    await window.SUPABASE.update('users', uid, { depto_status: 'rejected' });
+    await window.SUPABASE.update('users', id, { depto_status: 'rejected' });
     r.status = 'rejected';
-    const u = DB.users.find(u=>Number(u.id)===uid);
+    const u = DB.users.find(u=>u.id===id);
     if (u) { u.depto_status='rejected'; u.deptoStatus='rejected'; }
     renderResidents();
     showToast('Residente rechazado', 'error');
@@ -188,11 +199,15 @@ async function rejectResident(id) {
 
 async function deleteResident(id) {
   if (!confirm('¿Eliminar este usuario?')) return;
-  const uid = Number(id);
   try {
-    await window.SUPABASE.remove('users', uid);
-    DB.users     = DB.users.filter(u=>Number(u.id)!==uid);
-    DB.residents = DB.residents.filter(r=>Number(r.id)!==uid);
+    const client = window.SUPABASE?.client?.();
+    if (!client) throw new Error('Sin conexión a Supabase');
+    // Borra perfil + cuenta de Auth juntos (RPC security definer) para que
+    // la persona eliminada no pueda seguir iniciando sesión sin perfil.
+    const { error } = await client.rpc('delete_resident_complete', { p_user_id: id });
+    if (error) throw error;
+    DB.users     = DB.users.filter(u=>u.id!==id);
+    DB.residents = DB.residents.filter(r=>r.id!==id);
     renderResidents();
     showToast('Usuario eliminado');
   } catch(e) {
@@ -214,8 +229,8 @@ function editResidentModal(id) {
 }
 
 async function saveEditResident() {
-  const id  = Number(document.getElementById('editResId').value);
-  const r   = DB.residents.find(r=>Number(r.id)===id);
+  const id  = document.getElementById('editResId').value;
+  const r   = DB.residents.find(r=>r.id===id);
   if (!r) return;
   const name   = document.getElementById('editResName').value.trim();
   const email  = document.getElementById('editResEmail').value.trim();
@@ -225,7 +240,7 @@ async function saveEditResident() {
   try {
     await window.SUPABASE.update('users', id, { name, email, phone, depto, depto_status: status });
     r.name=name; r.email=email; r.phone=phone; r.depto=depto; r.status=status;
-    const u = DB.users.find(u=>Number(u.id)===id);
+    const u = DB.users.find(u=>u.id===id);
     if (u) { u.name=name; u.email=email; u.phone=phone; u.depto=depto; u.depto_status=status; u.deptoStatus=status; }
     closeModal('modalEditResident'); renderResidents(); showToast('Residente actualizado ✓');
   } catch(e) {
@@ -265,12 +280,19 @@ async function saveNewResident() {
 
 /* ── PAYMENTS / VOUCHERS (admin) ───────────────────────────── */
 function renderPayments() {
-  const month     = document.getElementById('filterPayMonth')?.value||'';
+  const depto     = document.getElementById('filterPayDepto')?.value||'';
   const residentPays = DB.payments.filter(p=>p.residentId||p.resident_id);
   const pending   = residentPays.filter(p=>p.status==='pending');
-  const all       = residentPays.filter(p=>p.status!=='rejected').filter(p=>!month||p.month===month);
+  const all       = residentPays.filter(p=>p.status!=='rejected').filter(p=>!depto||p.depto===depto);
   const ppb = document.getElementById('payPendingBadge');
   if (ppb) ppb.textContent = pending.length;
+
+  const deptoSel = document.getElementById('filterPayDepto');
+  if (deptoSel && deptoSel.children.length === 1) {
+    [...new Set(residentPays.map(p=>p.depto).filter(Boolean))].sort().forEach(d=>{
+      const o=document.createElement('option'); o.value=d; o.textContent=d; deptoSel.appendChild(o);
+    });
+  }
 
   document.getElementById('tblPendingPayments').innerHTML = pending.map(p=>`<tr>
     <td style="font-weight:500">${p.residentName||p.resident_name||'—'}</td>
@@ -283,7 +305,7 @@ function renderPayments() {
       <button class="btn btn-success btn-sm" onclick="approvePayment(${p.id})">✓ Aprobar</button>
       <button class="btn btn-danger btn-sm"  onclick="rejectPayment(${p.id})">✕ Rechazar</button>
       <button class="btn btn-danger btn-sm"  onclick="deletePayment(${p.id})">🗑 Eliminar</button>
-    </td></tr>`).join()||'<tr><td colspan="8" style="text-align:center;color:var(--mist);padding:1.5rem">Sin comprobantes pendientes ✓</td></tr>';
+    </td></tr>`).join('')||'<tr><td colspan="8" style="text-align:center;color:var(--mist);padding:1.5rem">Sin comprobantes pendientes ✓</td></tr>';
 
   document.getElementById('tblAllPayments').innerHTML = all.map(p=>`<tr>
     <td>${p.residentName||p.resident_name||'—'}</td><td>${p.depto||'—'}</td>
@@ -619,34 +641,47 @@ async function downloadAndCleanup() {
 
   // Limpieza real: solo borra los archivos en storage (comprobantes + recibos)
   // y limpia receipt_url/voucher_url — la fila de payments se conserva.
+  // Se hace en lotes (un remove() por bucket, un update() por todos los ids)
+  // en vez de una llamada de red por cada comprobante — con 50 comprobantes
+  // antes eran ~100-150 round-trips secuenciales, ahora son 3.
   const client = window.SUPABASE?.client?.();
-  const clearedIds = [];
-  for (const p of toArchive) {
-    try {
-      const voucherUrl = p.voucherUrl||p.voucher_url || null;
-      const receiptUrl = p.receiptUrl||p.receipt_url || null;
-      if (client && voucherUrl) {
-        const path = storagePathFromUrl(voucherUrl, '/comprobantes/');
-        if (path) {
-          const { data, error } = await client.storage.from('comprobantes').remove([path]);
-          if (error) throw new Error('Storage comprobantes: '+(error.message||error));
-          if (!data || data.length === 0) throw new Error('Comprobante no encontrado en storage (ruta: '+path+')');
+  const failedIds = new Set();
+
+  const voucherEntries = toArchive
+    .map(p => ({ id: p.id, path: storagePathFromUrl(p.voucherUrl||p.voucher_url||'', '/comprobantes/') }))
+    .filter(e => e.path);
+  const receiptEntries = toArchive
+    .map(p => ({ id: p.id, path: storagePathFromUrl(p.receiptUrl||p.receipt_url||'', '/recibos/') }))
+    .filter(e => e.path);
+
+  async function removeBatch(bucket, entries) {
+    if (!client || entries.length === 0) return;
+    const { data, error } = await client.storage.from(bucket).remove(entries.map(e => e.path));
+    if (error) {
+      console.error(`Storage ${bucket} (batch) failed`, error);
+      entries.forEach(e => failedIds.add(e.id));
+      return;
+    }
+    const removed = new Set((data||[]).map(d => d.name));
+    entries.forEach(e => { if (!removed.has(e.path)) failedIds.add(e.id); });
+  }
+  await removeBatch('comprobantes', voucherEntries);
+  await removeBatch('recibos', receiptEntries);
+
+  const clearedIds = toArchive.map(p => p.id).filter(id => !failedIds.has(id));
+  if (client && clearedIds.length) {
+    const { error } = await client.from('payments').update({ receipt_url: null, voucher_url: null }).in('id', clearedIds);
+    if (error) {
+      console.error('No se pudo limpiar las filas de payments (batch)', error);
+      clearedIds.length = 0;
+    } else {
+      const clearedSet = new Set(clearedIds);
+      toArchive.forEach(p => {
+        if (clearedSet.has(p.id)) {
+          p.receiptUrl = null; p.receipt_url = null;
+          p.voucherUrl = null; p.voucher_url = null;
         }
-      }
-      if (client && receiptUrl) {
-        const path = storagePathFromUrl(receiptUrl, '/recibos/');
-        if (path) {
-          const { data, error } = await client.storage.from('recibos').remove([path]);
-          if (error) throw new Error('Storage recibos: '+(error.message||error));
-          if (!data || data.length === 0) throw new Error('Recibo no encontrado en storage (ruta: '+path+')');
-        }
-      }
-      await window.SUPABASE.update('payments', p.id, { receipt_url: null, voucher_url: null });
-      p.receiptUrl = null; p.receipt_url = null;
-      p.voucherUrl = null; p.voucher_url = null;
-      clearedIds.push(p.id);
-    } catch(e) {
-      console.error('No se pudo limpiar el archivo del pago', p.id, e);
+      });
     }
   }
 
@@ -664,7 +699,7 @@ async function downloadAndCleanup() {
 }
 
 /* ── FINANCES (ledger completo: pagos de residentes + movimientos manuales) ── */
-function renderFinances() {
+async function renderFinances() {
   const month = document.getElementById('filterFinMonth')?.value||'';
   const type  = document.getElementById('filterFinType')?.value||'';
   const ledger = DB.payments.filter(p=>p.status==='approved');
@@ -675,7 +710,7 @@ function renderFinances() {
   );
   const totalIn  = filtered.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalEx  = filtered.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
-  const remanente = calcRemanente(month ? month+'-01' : firstDayOfCurrentMonth());
+  const remanente = await calcRemanente(month ? month+'-01' : firstDayOfCurrentMonth());
   const fm = document.getElementById('finMetrics');
   if (fm) fm.innerHTML = `
     <div class="metric"><div class="metric-label">Remanente mes anterior</div><div class="metric-value" style="color:${remanente>=0?'var(--navy)':'var(--c-red)'}">${fmt(remanente)}</div></div>
@@ -851,7 +886,8 @@ async function doImportTransactions() {
     showToast('Selecciona un archivo o pega los datos','error'); return;
   }
 
-  let imported = 0, failed = 0;
+  let failed = 0;
+  const records = [];
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
     if (!line.trim()) continue;
@@ -861,15 +897,25 @@ async function doImportTransactions() {
     if (!date && i === 0) continue; // encabezado (fecha,tipo,proveedor,concepto,monto)
     const amount = parseFloat(String(amountRaw||'').replace(/[^0-9.\-]/g,''));
     if (!date || !type || !concept || !amount) { failed++; continue; }
+    records.push({ type, date, amount, description:concept,
+      category: type==='income' ? 'Ingresos importados' : 'Egresos importados',
+      provider, reference:'', notes:'' });
+  }
+
+  // Un solo INSERT con todas las filas en vez de uno por línea — con un CSV
+  // de 100+ transacciones esto evita 100+ round-trips secuenciales.
+  let imported = 0;
+  if (records.length) {
     try {
-      const rec = { type, date, amount, description:concept,
-        category: type==='income' ? 'Ingresos importados' : 'Egresos importados',
-        provider, reference:'', notes:'' };
-      const rows = await window.SUPABASE.insert('payments', toDbTransaction(rec));
-      const row = Array.isArray(rows) ? rows[0] : rows;
-      if (row) DB.payments.push(normalizePayment(row));
-      imported++;
-    } catch(e) { console.error('Import transacción failed', line, e); failed++; }
+      const rows = await window.SUPABASE.insert('payments', records.map(toDbTransaction));
+      const rowsArr = Array.isArray(rows) ? rows : (rows ? [rows] : []);
+      rowsArr.forEach(row => DB.payments.push(normalizePayment(row)));
+      imported = rowsArr.length;
+      failed += records.length - rowsArr.length;
+    } catch(e) {
+      console.error('Import transacciones (batch) failed', e);
+      failed += records.length;
+    }
   }
   closeModal('modalImport'); renderFinances(); renderDashboard();
   showToast(`${imported} transacciones importadas${failed?` (${failed} con error, revisa formato de fecha/tipo/monto)`:''} ✓`, failed && !imported ? 'error' : 'success');
@@ -894,12 +940,37 @@ function exportCSV() {
 }
 
 /* ── REPORTS ────────────────────────────────────────────────── */
-function renderReports() {
+/* Antes esto filtraba DB.residents/DB.payments completos en memoria — ahora
+   el remanente, los totales del mes y el estado de cobro por residente se
+   calculan en Postgres (fn_remanente/fn_month_totals/fn_resident_report),
+   así esta vista no depende de tener el histórico completo de pagos cargado. */
+async function renderReports() {
   const monthStart = firstDayOfCurrentMonth();
-  const remanente = calcRemanente(monthStart);
-  const thisMonth = DB.payments.filter(p => p.status==='approved' && txLedgerDate(p) >= monthStart);
-  const ingresosMes = thisMonth.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
-  const egresosMes  = thisMonth.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
+  const today = new Date();
+  const monthLabel = today.toLocaleDateString('es-MX', { month: 'long' }) + ' ' + today.getFullYear();
+
+  const client = window.SUPABASE?.client?.();
+  let remanente = 0, ingresosMes = 0, egresosMes = 0, rows = [];
+  if (client) {
+    try {
+      const [remRes, totalsRes, reportRes] = await Promise.all([
+        client.rpc('fn_remanente', { p_before_date: monthStart }),
+        client.rpc('fn_month_totals', { p_month_start: monthStart }),
+        client.rpc('fn_resident_report', { p_month_label: monthLabel }),
+      ]);
+      if (remRes.error) throw remRes.error;
+      if (totalsRes.error) throw totalsRes.error;
+      if (reportRes.error) throw reportRes.error;
+      remanente = Number(remRes.data) || 0;
+      const totalsRow = Array.isArray(totalsRes.data) ? totalsRes.data[0] : totalsRes.data;
+      ingresosMes = Number(totalsRow?.income) || 0;
+      egresosMes  = Number(totalsRow?.expense) || 0;
+      rows = reportRes.data || [];
+    } catch (e) {
+      console.error('No se pudo cargar el reporte', e);
+      showToast('Error al cargar el reporte: '+(e?.message||e), 'error');
+    }
+  }
   const remanenteSiguiente = remanente + ingresosMes - egresosMes;
   const summary = document.getElementById('reportSummary');
   if (summary) summary.innerHTML = `
@@ -910,19 +981,11 @@ function renderReports() {
 
   const tbody = document.getElementById('tblReport');
   if (!tbody) return;
-  tbody.innerHTML = DB.residents.map(r=>{
-    const myPays=DB.payments.filter(p=>(p.residentId===r.id||p.resident_id===r.id)&&p.status==='approved');
-    const latest=myPays.sort((a,b)=>new Date(b.approvedDate||b.approved_date)-new Date(a.approvedDate||a.approved_date))[0];
-    const hasCurrent=myPays.find(p=>{
-      const d=new Date(); const mn=d.toLocaleDateString('es-MX',{month:'long'})+' '+d.getFullYear();
-      return (p.month||'').toLowerCase().includes(mn.toLowerCase());
-    });
-    return `<tr>
-      <td><strong>${r.depto||'—'}</strong></td><td>${r.name}</td><td>${fmt(DB.settings?.defaultFee||400)}</td>
-      <td><span class="badge ${hasCurrent?'badge-approved':r.status==='approved'?'badge-pending':'badge-rejected'}">${hasCurrent?'Pagado':r.status==='approved'?'Pendiente':'Inactivo'}</span></td>
-      <td>${latest?fmtDate(latest.approvedDate||latest.approved_date):'—'}</td>
-    </tr>`;
-  }).join('');
+  tbody.innerHTML = rows.map(r=>`<tr>
+      <td><strong>${r.depto||'—'}</strong></td><td>${r.name}</td><td>${fmt(r.fee||DB.settings?.defaultFee||400)}</td>
+      <td><span class="badge ${r.has_current?'badge-approved':r.status==='approved'?'badge-pending':'badge-rejected'}">${r.has_current?'Pagado':r.status==='approved'?'Pendiente':'Inactivo'}</span></td>
+      <td>${r.latest_date?fmtDate(r.latest_date):'—'}</td>
+    </tr>`).join('') || '<tr><td colspan="5" style="text-align:center;color:var(--mist);padding:1.5rem">Sin residentes</td></tr>';
 }
 
 /* ── EDIT CONTACTS (admin) ─────────────────────────────────── */

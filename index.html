@@ -5,8 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Real Molinos 3 — Privada</title>
 <link rel="icon" href="assets/LogoM3.svg" type="image/svg+xml">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-<link rel="stylesheet" href="css/styles.css?v=20260620b">
+<link rel="stylesheet" href="css/styles.css?v=20260624">
 </head>
 <body>
 
@@ -37,12 +40,6 @@
         <div class="field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="tu@correo.com"></div>
         <div class="field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
         <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar</button>
-
-        <!-- Credenciales de acceso rápido -->
-        <div style="margin-top:14px;font-size:12px;color:var(--mist);text-align:center;line-height:2">
-          <span>admin@molino.com / admin123</span><br>
-          <span>persona@gmail.com / persona123</span>
-        </div>
       </div>
 
       <!-- REGISTER -->
@@ -222,10 +219,8 @@
         <div class="card">
           <div class="card-head">
             <span class="card-title">Historial</span>
-            <select id="filterPayMonth" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderPayments()">
-              <option value="">Todos los meses</option>
-              <option>Enero 2026</option><option>Febrero 2026</option><option>Marzo 2026</option>
-              <option>Abril 2026</option><option>Mayo 2026</option><option>Junio 2026</option>
+            <select id="filterPayDepto" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderPayments()">
+              <option value="">Todos los deptos</option>
             </select>
           </div>
           <div class="tbl-wrap"><table>
@@ -428,10 +423,7 @@
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="field"><label>Mes de pago</label>
-          <select id="payMonth">
-            <option>Enero 2026</option><option>Febrero 2026</option><option>Marzo 2026</option>
-            <option>Abril 2026</option><option>Mayo 2026</option><option selected>Junio 2026</option>
-          </select>
+          <select id="payMonth"></select>
         </div>
         <div class="field"><label>Monto pagado (MXN)</label><input type="number" id="payAmount" placeholder="1500.00"></div>
       </div>
@@ -563,11 +555,11 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js/dist/umd/supabase.min.js"></script>
-<script src="js/supabase.js?v=20260620b"></script>
+<script src="js/supabase.js?v=20260624"></script>
 <script src="js/db.js?v=20260620b"></script>
-<script src="js/data.js?v=20260620b"></script>
-<script src="js/auth.js?v=20260620b"></script>
-<script src="js/app.js?v=20260620b"></script>
-<script src="js/admin.js?v=20260620b"></script>
+<script src="js/data.js?v=20260624"></script>
+<script src="js/auth.js?v=20260624"></script>
+<script src="js/app.js?v=20260624"></script>
+<script src="js/admin.js?v=20260624"></script>
 </body>
 </html>

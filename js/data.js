@@ -61,9 +61,9 @@ async function loadDB() {
   }
   try {
     const [users, payments, notifications, settingsRows] = await Promise.all([
-      sb.list('users'),
-      sb.list('payments'),
-      sb.list('notifications').catch(e => { console.warn('Tabla notifications no disponible', e); return []; }),
+      sb.listColumns('users', 'id,name,email,role,phone,depto,depto_status,fee,created_at'),
+      sb.listColumns('payments', 'id,resident_id,resident_name,depto,month,amount,status,sent_date,approved_date,receipt_num,voucher_url,payment_date,receipt_url,type,description,category,reference,notes,provider'),
+      sb.listColumns('notifications', 'id,user_id,message,is_read,created_at').catch(e => { console.warn('Tabla notifications no disponible', e); return []; }),
       sb.list('settings').catch(e => { console.warn('Tabla settings no disponible (corre la migración SQL)', e); return []; }),
     ]);
     DB.users         = (users         || []).map(normalizeUser);
@@ -76,12 +76,6 @@ async function loadDB() {
       if (settingsRow.contacts && Object.keys(settingsRow.contacts).length) DB.contacts = settingsRow.contacts;
       if (settingsRow.default_fee != null) DB.settings.defaultFee = settingsRow.default_fee;
     }
-
-    const maxId = Math.max(1,
-      ...DB.users.map(u => Number(u.id)||0),
-      ...DB.payments.map(p => Number(p.id)||0)
-    );
-    DB.nextId = maxId + 1;
 
     console.info('✅ DB cargada desde Supabase', {
       users: DB.users.length, residents: DB.residents.length,
@@ -130,6 +124,13 @@ function toDbTransaction(obj) {
 }
 
 window.addEventListener('load', async () => {
+  // Espera a que supabase-js restaure la sesión persistida (si la hay) ANTES
+  // de cargar la DB — si no, loadDB() corre como anon, y con RLS endurecido
+  // (users/payments restringidos a `authenticated`) esa primera carga llega
+  // vacía aunque el usuario ya tenga sesión guardada en localStorage. Para un
+  // login nuevo (sin sesión previa) loadDB() se repite en doLogin().
+  const client = window.SUPABASE?.client?.();
+  if (client) { try { await client.auth.getSession(); } catch(e) { console.warn('No se pudo verificar sesión previa', e); } }
   await loadDB();
   if (typeof restoreSession === 'function') restoreSession();
 });

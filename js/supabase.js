@@ -67,6 +67,23 @@
     return apiFetch(`${table}${q}`, { method: 'GET' });
   }
 
+  // Como list(), pero pidiendo solo las columnas indicadas en vez de '*' —
+  // para tablas que se cargan completas (loadDB) y arrastran columnas que
+  // ninguna vista necesita (ej. password_hash, receipt_url de TODO el
+  // historial cuando solo se va a mostrar nombre/depto/status).
+  async function listColumns(table, columns) {
+    if (SUPABASE_CLIENT) {
+      try {
+        const { data, error } = await SUPABASE_CLIENT.from(table).select(columns);
+        if (error) throw error;
+        return data || [];
+      } catch (err) {
+        console.warn('supabase-js listColumns failed, falling back to REST', err);
+      }
+    }
+    return apiFetch(`${table}?select=${encodeURIComponent(columns)}`, { method: 'GET' });
+  }
+
   async function get(table, id) {
     // Assumes primary key column is `id` and uses eq.id
     if (SUPABASE_CLIENT) {
@@ -126,6 +143,7 @@
       }
     },
     list,
+    listColumns,
     get,
     insert,
     update,

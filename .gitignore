@@ -1,0 +1,9 @@
+# Claude Code local settings (específico de esta máquina, no compartir)
+.claude/
+
+# Proyecto mobile vive en su propio repo (mobile/.git)
+mobile/
+
+# OS
+.DS_Store
+Thumbs.db
