@@ -160,16 +160,23 @@ async function doRegister() {
 
     if (!depto) { showAlert('alertAuth', 'El número de departamento es requerido', 'error'); return; }
 
-    const userData = await window.SUPABASE.insert('users', {
-      id: data.user.id, name, email, phone, role: 'resident',
-      depto, depto_status: 'pending', fee: DB.settings?.defaultFee || 400
+    // signUp() no otorga sesión hasta confirmar el correo (la app confirma
+    // manualmente vía admin, nunca por link), así que un INSERT directo a
+    // `users` viaja sin auth.uid() y la política de RLS siempre lo rechaza.
+    // register_resident_profile es SECURITY DEFINER y verifica server-side
+    // que el id venga de la cuenta de auth recién creada con ese correo.
+    const fee = DB.settings?.defaultFee || 400;
+    const { error: rpcError } = await client.rpc('register_resident_profile', {
+      p_id: data.user.id, p_name: name, p_email: email, p_phone: phone, p_depto: depto, p_fee: fee
     });
+    if (rpcError) throw rpcError;
 
-    if (Array.isArray(userData) && userData[0]) {
-      const newUser = { ...userData[0], deptoStatus: 'pending', depto_status: 'pending' };
-      DB.users.push(newUser);
-      if (typeof syncResidentsFromUsers === 'function') syncResidentsFromUsers();
-    }
+    const newUser = {
+      id: data.user.id, name, email, phone, role: 'resident', depto, fee,
+      depto_status: 'pending', deptoStatus: 'pending',
+    };
+    DB.users.push(newUser);
+    if (typeof syncResidentsFromUsers === 'function') syncResidentsFromUsers();
 
     console.info('📬 Nuevo registro pendiente de autorización:', name, depto);
     showAlert('alertAuth', '✓ Registro enviado. El administrador autorizará tu acceso.', 'success');
