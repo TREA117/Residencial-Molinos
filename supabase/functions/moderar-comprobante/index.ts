@@ -31,10 +31,16 @@ Deno.serve(async (req) => {
 
   let safe: Record<string, string> = {};
   let isFlagged = false;
+  let downloadOk = false;
 
   // Intentar descargar y analizar la imagen
-  const imgResponse = await fetch(voucherUrl);
-  if (imgResponse.ok) {
+  let imgResponse: Response | null = null;
+  try {
+    imgResponse = await fetch(voucherUrl);
+  } catch { /* error de red — tratar como descarga fallida */ }
+
+  if (imgResponse?.ok) {
+    downloadOk = true;
     const imgBuffer = await imgResponse.arrayBuffer();
     const base64 = encodeBase64(new Uint8Array(imgBuffer));
 
@@ -68,7 +74,7 @@ Deno.serve(async (req) => {
       event_type: 'file_moderation',
       user_id: userId,
       file_path: voucherUrl,
-      result: { safeSearch: safe, flagged: isFlagged, downloadOk: imgResponse.ok },
+      result: { safeSearch: safe, flagged: isFlagged, downloadOk },
     });
   } catch { /* fire-and-forget */ }
 
