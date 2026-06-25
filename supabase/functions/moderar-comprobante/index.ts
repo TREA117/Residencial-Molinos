@@ -29,59 +29,66 @@ Deno.serve(async (req) => {
   const userId = record.resident_id as string | null;
   const voucherUrl = record.voucher_url as string;
 
-  // Descargar imagen del Storage
+  let safe: Record<string, string> = {};
+  let isFlagged = false;
+
+  // Intentar descargar y analizar la imagen
   const imgResponse = await fetch(voucherUrl);
-  if (!imgResponse.ok) {
-    return new Response('ok', { status: 200 }); // no bloquear si no se puede descargar
+  if (imgResponse.ok) {
+    const imgBuffer = await imgResponse.arrayBuffer();
+    const base64 = encodeBase64(new Uint8Array(imgBuffer));
+
+    const apiKey = Deno.env.get('CLOUD_VISION_API_KEY')!;
+    const visionRes = await fetch(
+      `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: [{
+            image: { content: base64 },
+            features: [{ type: 'SAFE_SEARCH_DETECTION', maxResults: 1 }],
+          }],
+        }),
+      }
+    );
+
+    const visionData = await visionRes.json();
+    safe = visionData.responses?.[0]?.safeSearchAnnotation ?? {};
+    isFlagged =
+      FLAGGED_LEVELS.has(safe.adult) ||
+      FLAGGED_LEVELS.has(safe.violence) ||
+      FLAGGED_LEVELS.has(safe.racy);
   }
-  const imgBuffer = await imgResponse.arrayBuffer();
-  const base64 = encodeBase64(new Uint8Array(imgBuffer));
+  // If download failed: safe={}, isFlagged=false — still write audit_log below
 
-  // Llamar a Cloud Vision Safe Search
-  const apiKey = Deno.env.get('CLOUD_VISION_API_KEY')!;
-  const visionRes = await fetch(
-    `https://vision.googleapis.com/v1/images:annotate?key=${apiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        requests: [{
-          image: { content: base64 },
-          features: [{ type: 'SAFE_SEARCH_DETECTION', maxResults: 1 }],
-        }],
-      }),
-    }
-  );
-
-  const visionData = await visionRes.json();
-  const safe = visionData.responses?.[0]?.safeSearchAnnotation ?? {};
-
-  const isFlagged =
-    FLAGGED_LEVELS.has(safe.adult) ||
-    FLAGGED_LEVELS.has(safe.violence) ||
-    FLAGGED_LEVELS.has(safe.racy);
-
-  // Registrar en audit_log
-  await supabaseAdmin.from('audit_log').insert({
-    event_type: 'file_moderation',
-    user_id: userId,
-    file_path: voucherUrl,
-    result: { safeSearch: safe, flagged: isFlagged },
-  });
+  // Siempre registrar en audit_log (fire-and-forget)
+  try {
+    await supabaseAdmin.from('audit_log').insert({
+      event_type: 'file_moderation',
+      user_id: userId,
+      file_path: voucherUrl,
+      result: { safeSearch: safe, flagged: isFlagged, downloadOk: imgResponse.ok },
+    });
+  } catch { /* fire-and-forget */ }
 
   if (isFlagged) {
-    // Rechazar el pago automáticamente
-    await supabaseAdmin
-      .from('payments')
-      .update({ status: 'rejected' })
-      .eq('id', paymentId);
+    // Rechazar el pago (fire-and-forget)
+    try {
+      await supabaseAdmin
+        .from('payments')
+        .update({ status: 'rejected' })
+        .eq('id', paymentId);
+    } catch { /* fire-and-forget */ }
 
-    // Notificar al residente
+    // Notificar al residente (fire-and-forget)
     if (userId) {
-      await supabaseAdmin.from('notifications').insert({
-        user_id: userId,
-        message: 'Tu comprobante fue rechazado automáticamente por contener contenido no permitido por nuestras políticas.',
-      });
+      try {
+        await supabaseAdmin.from('notifications').insert({
+          user_id: userId,
+          message: 'Tu comprobante fue rechazado automáticamente por contener contenido no permitido por nuestras políticas.',
+        });
+      } catch { /* fire-and-forget */ }
     }
   }
 
