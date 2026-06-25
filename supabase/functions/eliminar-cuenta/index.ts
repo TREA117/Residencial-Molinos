@@ -36,7 +36,7 @@ Deno.serve(async (req) => {
   const userId = user.id;
 
   // 1. Anonimizar PII en public.users
-  const { error: updateError } = await supabaseAdmin
+  const { data: updated, error: updateError } = await supabaseAdmin
     .from('users')
     .update({
       name: 'Usuario Eliminado',
@@ -46,11 +46,18 @@ Deno.serve(async (req) => {
       is_deleted: true,
       deleted_at: new Date().toISOString(),
     })
-    .eq('id', userId);
+    .eq('id', userId)
+    .select('id');
 
   if (updateError) {
     return new Response(JSON.stringify({ error: 'Error al anonimizar datos: ' + updateError.message }), {
       status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+  if (!updated || updated.length === 0) {
+    return new Response(JSON.stringify({ error: 'Perfil de usuario no encontrado' }), {
+      status: 404,
       headers: { 'Content-Type': 'application/json' },
     });
   }
