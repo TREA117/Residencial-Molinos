@@ -188,6 +188,47 @@ async function markNotificationRead(id) {
   renderMyPayments();
 }
 
+/* ── DELETE ACCOUNT ─────────────────────────────────────────── */
+async function deleteAccountWeb() {
+  const confirmed1 = window.confirm(
+    '¿Estás seguro?\n\nEsta acción eliminará permanentemente tu cuenta y todos tus datos personales. Es irreversible.'
+  );
+  if (!confirmed1) return;
+
+  const confirmed2 = window.confirm(
+    'Confirmación final: se eliminarán tus datos y se cerrará tu sesión permanentemente.\n\n¿Confirmas la eliminación?'
+  );
+  if (!confirmed2) return;
+
+  const btn = document.getElementById('btn-delete-account');
+  if (btn) { btn.disabled = true; btn.textContent = 'Eliminando...'; }
+
+  try {
+    const client = window.SUPABASE.client();
+    const { data: { session } } = await client.auth.getSession();
+    if (!session?.access_token) throw new Error('No hay sesión activa.');
+
+    const res = await fetch('https://qxjuztctbpwymmskdyqw.supabase.co/functions/v1/eliminar-cuenta', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error || 'No se pudo eliminar la cuenta.');
+    }
+
+    await client.auth.signOut();
+    doLogout();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = 'Eliminar mi cuenta'; }
+    showToast(e.message || 'Error al eliminar la cuenta. Intenta más tarde.', 'error');
+  }
+}
+
 /* ── MY ACCOUNT STATEMENT (estado de cuenta) ───────────────── */
 function renderMyAccount() {
   if (!currentUser) return;
@@ -224,6 +265,15 @@ function renderMyAccount() {
           </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin movimientos</td></tr>'}
         </tbody>
       </table></div>
+    </div>
+    <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--gold-light)">
+      <p style="font-size:.85rem;color:var(--mist);margin:0 0 .75rem">Zona de peligro</p>
+      <button id="btn-delete-account"
+        onclick="deleteAccountWeb()"
+        style="background:#fff;color:#c0392b;border:1.5px solid #c0392b;border-radius:8px;
+               padding:.6rem 1.25rem;font-size:.9rem;cursor:pointer;font-family:inherit;font-weight:600">
+        Eliminar mi cuenta
+      </button>
     </div>`;
 }
 
