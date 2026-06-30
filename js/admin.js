@@ -2,6 +2,10 @@
    Real Molinos 3 — Vistas de Administrador
    ================================================================ */
 
+function escH(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
 /* ── DASHBOARD ─────────────────────────────────────────────── */
 /* Filtro de fecha compartido por Dashboard e Ingresos/Egresos:
    from/to vacíos = sin límite en ese extremo. */
@@ -315,6 +319,112 @@ function renderPayments() {
     <td><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">🗑 Eliminar</button></td>
   </tr>`).join('');
   updatePendingCounts();
+}
+
+function openCashPaymentModal() {
+  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  // Residentes autorizados ordenados por depto
+  const sel = document.getElementById('cashResidentId');
+  sel.innerHTML = DB.residents
+    .filter(r => r.status === 'approved')
+    .sort((a, b) => (a.depto||'').localeCompare(b.depto||''))
+    .map(r => `<option value="${escH(r.id)}">${escH(r.depto)} — ${escH(r.name)}</option>`)
+    .join('');
+  // Últimos 12 meses + mes actual
+  const mSel = document.getElementById('cashMonth');
+  const now = new Date();
+  const opts = [];
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+    opts.push(`<option value="${label}"${i===0?' selected':''}>${label}</option>`);
+  }
+  mSel.innerHTML = opts.join('');
+  document.getElementById('cashAmount').value = DB.settings?.defaultFee || 400;
+  document.getElementById('cashDate').value   = now.toISOString().split('T')[0];
+  document.getElementById('cashNotes').value  = '';
+  openModal('modalCashPayment');
+}
+
+async function saveCashPayment() {
+  const residentId = document.getElementById('cashResidentId').value;
+  const month      = document.getElementById('cashMonth').value;
+  const amount     = parseFloat(document.getElementById('cashAmount').value);
+  const payDate    = document.getElementById('cashDate').value;
+  const notes      = document.getElementById('cashNotes').value.trim();
+  if (!residentId || !month || !amount || !payDate) {
+    showToast('Completa todos los campos requeridos', 'error'); return;
+  }
+  const resident = DB.residents.find(r => r.id === residentId);
+  if (!resident) { showToast('Residente no encontrado', 'error'); return; }
+
+  const d = new Date(payDate + 'T12:00:00');
+  const mm   = String(d.getMonth() + 1).padStart(2, '0');
+  const yyyy = d.getFullYear();
+  const receiptNum = `${yyyy}-${mm}-${resident.depto}`;
+  const desc = `Cuota mantenimiento ${month} — Depto ${resident.depto}`;
+  const today = new Date().toISOString().split('T')[0];
+
+  const btn = document.querySelector('#modalCashPayment .btn-gold');
+  if (btn) { btn.disabled = true; btn.textContent = 'Registrando...'; }
+
+  try {
+    const rows = await window.SUPABASE.insert('payments', {
+      resident_id: residentId, resident_name: resident.name,
+      depto: resident.depto, month, amount,
+      status: 'approved', type: 'income',
+      description: desc, category: 'Mantenimiento',
+      payment_date: payDate, approved_date: today,
+      receipt_num: receiptNum, has_voucher: false,
+      notes: notes || 'Pago en efectivo registrado por administración',
+    });
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('Sin respuesta del servidor');
+
+    const p = {
+      ...row,
+      residentId: row.resident_id, residentName: row.resident_name,
+      receiptNum: row.receipt_num, receiptUrl: null,
+      paymentDate: row.payment_date, approvedDate: row.approved_date,
+      hasVoucher: false,
+    };
+    DB.payments.push(p);
+
+    // Notificar al residente
+    try {
+      const notifRows = await window.SUPABASE.insert('notifications', {
+        user_id: residentId,
+        message: `Tu pago de ${month} fue registrado por administración. Ya puedes descargar tu recibo (${receiptNum}).`,
+        is_read: false,
+      });
+      const notifRow = Array.isArray(notifRows) ? notifRows[0] : notifRows;
+      if (notifRow && typeof normalizeNotification === 'function') DB.notifications.push(normalizeNotification(notifRow));
+    } catch(ne) { console.warn('No se pudo crear la notificación', ne); }
+
+    closeModal('modalCashPayment');
+    renderPayments();
+    showToast('✓ Pago registrado — Recibo ' + receiptNum);
+    showReceipt(p.id);
+
+    // Generar y subir recibo a Storage
+    try {
+      const blob = await generateReceiptImageBlob(p);
+      const url  = await uploadReceiptImage(p, blob);
+      if (!url) throw new Error('uploadReceiptImage no devolvió URL');
+      await window.SUPABASE.update('payments', p.id, { receipt_url: url });
+      p.receiptUrl = url; p.receipt_url = url;
+      if (typeof renderMyPayments === 'function') renderMyPayments();
+      if (typeof renderVouchers === 'function') renderVouchers();
+    } catch(ue) {
+      console.error('No se pudo subir el recibo a Storage', ue);
+      showToast('Pago registrado, pero no se pudo subir el recibo: ' + (ue?.message||ue), 'error');
+    }
+  } catch(e) {
+    console.error('Error al registrar pago en efectivo', e);
+    showToast('Error: ' + (e?.message||e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Registrar y generar recibo'; }
+  }
 }
 
 async function approvePayment(id) {
