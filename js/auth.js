@@ -134,6 +134,15 @@ async function doRegister() {
   if (!name || !email || !pass) {
     showAlert('alertAuth', 'Completa nombre, correo y contraseña', 'error'); return;
   }
+  if (pass.length < 8) {
+    showAlert('alertAuth', 'La contraseña debe tener al menos 8 caracteres', 'error'); return;
+  }
+  if (!/\d/.test(pass)) {
+    showAlert('alertAuth', 'La contraseña debe incluir al menos un número', 'error'); return;
+  }
+  if (!/[!@#$%^&*()\-_=+\[\]{};':",.<>/?\\|`~]/.test(pass)) {
+    showAlert('alertAuth', 'La contraseña debe incluir al menos un carácter especial (ej. !, @, #, $)', 'error'); return;
+  }
 
   const client = window.SUPABASE?.client?.();
   if (!client) { showAlert('alertAuth', 'Error de conexión con el servidor', 'error'); return; }

@@ -53,7 +53,9 @@
                  oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')">
           <div class="field-hint">⚠️ Escribe tu departamento en MAYÚSCULAS y SIN ESPACIOS. Ejemplo: 10H, 7E, 2B</div>
         </div>
-        <div class="field"><label>Contraseña</label><input type="password" id="regPass" placeholder="Mínimo 8 caracteres"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="regPass" placeholder="Mínimo 8 caracteres">
+          <div class="field-hint">Mínimo 8 caracteres, al menos un número y un carácter especial (ej. !, @, #, $)</div>
+        </div>
         <button class="btn btn-primary btn-full" onclick="doRegister()">Solicitar acceso</button>
         <p style="font-size:11px;color:var(--mist);text-align:center;margin-top:10px">Al registrarte, administración recibirá una notificación para autorizar tu acceso.</p>
       </div>
@@ -558,7 +560,7 @@
 <script src="js/supabase.js?v=20260624"></script>
 <script src="js/db.js?v=20260620b"></script>
 <script src="js/data.js?v=20260624"></script>
-<script src="js/auth.js?v=20260624"></script>
+<script src="js/auth.js?v=20260630"></script>
 <script src="js/app.js?v=20260625"></script>
 <script src="js/admin.js?v=20260624"></script>
 </body>
