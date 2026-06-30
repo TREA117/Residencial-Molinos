@@ -40,6 +40,24 @@
         <div class="field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="tu@correo.com"></div>
         <div class="field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
         <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar</button>
+        <button class="btn btn-ghost btn-full" onclick="switchAuth('forgot')" style="margin-top:6px;font-size:13px">¿Olvidaste tu contraseña?</button>
+      </div>
+
+      <!-- FORGOT PASSWORD -->
+      <div id="formForgotPassword" class="hidden">
+        <p style="font-size:13px;margin:0 0 12px;color:var(--slate)">Te enviaremos un enlace de recuperación a tu correo electrónico.</p>
+        <div class="field"><label>Correo electrónico</label><input type="email" id="forgotEmail" placeholder="tu@correo.com"></div>
+        <button class="btn btn-primary btn-full" onclick="doForgotPassword()">Enviar enlace</button>
+        <button class="btn btn-ghost btn-full" onclick="switchAuth('login')" style="margin-top:6px;font-size:13px">← Volver al inicio de sesión</button>
+      </div>
+
+      <!-- RESET PASSWORD (desde enlace de correo) -->
+      <div id="formResetPassword" class="hidden">
+        <p style="font-size:13px;margin:0 0 12px;color:var(--slate)">Ingresa tu nueva contraseña.</p>
+        <div class="field"><label>Nueva contraseña</label><input type="password" id="newPassReset" placeholder="Mínimo 8 caracteres">
+          <div class="field-hint">Mínimo 8 caracteres, al menos un número y un carácter especial (ej. !, @, #, $)</div>
+        </div>
+        <button class="btn btn-primary btn-full" onclick="doSetNewPassword()">Guardar contraseña</button>
       </div>
 
       <!-- REGISTER -->
@@ -507,6 +525,26 @@
   </div>
 </div>
 
+<!-- Reset Password (Admin) -->
+<div class="modal-overlay" id="modalResetPassword">
+  <div class="modal" style="max-width:400px">
+    <div class="modal-head"><span class="modal-title">Restablecer contraseña</span><button class="modal-close" onclick="closeModal('modalResetPassword')">✕</button></div>
+    <div class="modal-body">
+      <input type="hidden" id="resetResId">
+      <p id="resetResName" style="font-weight:600;margin:0 0 12px;color:var(--navy)"></p>
+      <div class="field">
+        <label>Nueva contraseña temporal</label>
+        <input type="text" id="resetResPass" placeholder="Mínimo 8 caracteres, número y carácter especial">
+        <div class="field-hint">Comunica esta contraseña al residente por WhatsApp o teléfono. Los valores originales no pueden recuperarse.</div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-secondary" onclick="closeModal('modalResetPassword')">Cancelar</button>
+      <button class="btn btn-gold" onclick="saveResetPassword()">Restablecer</button>
+    </div>
+  </div>
+</div>
+
 <!-- Import CSV -->
 <div class="modal-overlay" id="modalImport">
   <div class="modal">
@@ -562,6 +600,6 @@
 <script src="js/data.js?v=20260624"></script>
 <script src="js/auth.js?v=20260630"></script>
 <script src="js/app.js?v=20260625"></script>
-<script src="js/admin.js?v=20260624"></script>
+<script src="js/admin.js?v=20260630"></script>
 </body>
 </html>

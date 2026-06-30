@@ -152,6 +152,7 @@ function renderResidents() {
     <td>${r.email||'—'}</td><td>${r.phone||'—'}</td>
     <td style="display:flex;gap:6px">
       <button class="btn btn-secondary btn-sm" onclick="editResidentModal('${r.id}')">Editar</button>
+      <button class="btn btn-secondary btn-sm" onclick="resetPasswordModal('${r.id}')">Reset clave</button>
       <button class="btn btn-danger btn-sm"    onclick="deleteResident('${r.id}')">Eliminar</button>
     </td></tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin resultados</td></tr>';
   updatePendingCounts();
@@ -213,6 +214,33 @@ async function deleteResident(id) {
   } catch(e) {
     console.error('Supabase delete failed', e);
     showToast('Error al eliminar en Supabase: '+(e?.message||e),'error');
+  }
+}
+
+function resetPasswordModal(id) {
+  const r = DB.residents.find(r=>r.id===id);
+  if (!r) return;
+  document.getElementById('resetResId').value = r.id;
+  document.getElementById('resetResName').textContent = (r.name||'Residente') + ' — Depto ' + (r.depto||'?');
+  document.getElementById('resetResPass').value = '';
+  openModal('modalResetPassword');
+}
+
+async function saveResetPassword() {
+  const id   = document.getElementById('resetResId').value;
+  const pass = document.getElementById('resetResPass').value;
+  if (!pass || pass.length < 8) { showToast('La contraseña debe tener al menos 8 caracteres', 'error'); return; }
+  if (!/\d/.test(pass)) { showToast('Incluye al menos un número', 'error'); return; }
+  if (!/[!@#$%^&*()\-_=+\[\]{};\':",.<>/?\\|`~]/.test(pass)) { showToast('Incluye al menos un carácter especial', 'error'); return; }
+  try {
+    const client = window.SUPABASE?.client?.();
+    if (!client) throw new Error('Sin conexión a Supabase');
+    const { error } = await client.rpc('admin_reset_user_password', { p_user_id: id, p_new_password: pass });
+    if (error) throw error;
+    closeModal('modalResetPassword');
+    showToast('Contraseña restablecida ✓ — Comunícala al residente por WhatsApp o teléfono.');
+  } catch(e) {
+    showToast('Error al restablecer: ' + (e?.message||e), 'error');
   }
 }
 

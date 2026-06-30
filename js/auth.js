@@ -45,6 +45,9 @@ function stopInactivityWatch() {
 }
 
 function restoreSession() {
+  // Listener para enlace de recuperación de contraseña (hash #type=recovery en la URL)
+  initPasswordRecoveryListener();
+
   const raw = localStorage.getItem(SESSION_KEY);
   if (!raw) return;
   try {
@@ -55,14 +58,68 @@ function restoreSession() {
 }
 
 function switchAuth(mode) {
-  ['Login', 'Register'].forEach(m =>
-    document.getElementById('form' + m).classList.add('hidden')
+  ['Login', 'Register', 'ForgotPassword', 'ResetPassword'].forEach(m =>
+    document.getElementById('form' + m)?.classList.add('hidden')
   );
-  document.getElementById('form' + mode.charAt(0).toUpperCase() + mode.slice(1))
-    .classList.remove('hidden');
+  const id = 'form' + mode.charAt(0).toUpperCase() + mode.slice(1);
+  document.getElementById(id)?.classList.remove('hidden');
+  const tabMode = (mode === 'login' || mode === 'forgot' || mode === 'reset') ? 'login' : 'register';
   document.querySelectorAll('.auth-tab').forEach((t, i) =>
-    t.classList.toggle('active', i === (mode === 'login' ? 0 : 1))
+    t.classList.toggle('active', i === (tabMode === 'login' ? 0 : 1))
   );
+}
+
+async function doForgotPassword() {
+  const email = document.getElementById('forgotEmail').value.trim().toLowerCase();
+  if (!email) { showAlert('alertAuth', 'Ingresa tu correo electrónico', 'error'); return; }
+  const client = window.SUPABASE?.client?.();
+  if (!client) { showAlert('alertAuth', 'Error de conexión', 'error'); return; }
+  const btn = document.querySelector('#formForgotPassword .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Enviando...'; }
+  try {
+    const { error } = await client.auth.resetPasswordForEmail(email, {
+      redirectTo: 'https://trea117.github.io/Residencial-Molinos/',
+    });
+    if (error) throw error;
+    showAlert('alertAuth', '✓ Enlace enviado — revisa tu correo y haz clic en el link para crear tu nueva contraseña.', 'success');
+  } catch(e) {
+    showAlert('alertAuth', 'Error: ' + (e?.message || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Enviar enlace'; }
+  }
+}
+
+async function doSetNewPassword() {
+  const pass = document.getElementById('newPassReset').value;
+  if (!pass || pass.length < 8) { showAlert('alertAuth', 'La contraseña debe tener al menos 8 caracteres', 'error'); return; }
+  if (!/\d/.test(pass)) { showAlert('alertAuth', 'Incluye al menos un número', 'error'); return; }
+  if (!/[!@#$%^&*()\-_=+\[\]{};':",.<>/?\\|`~]/.test(pass)) { showAlert('alertAuth', 'Incluye al menos un carácter especial', 'error'); return; }
+  const client = window.SUPABASE?.client?.();
+  if (!client) { showAlert('alertAuth', 'Error de conexión', 'error'); return; }
+  const btn = document.querySelector('#formResetPassword .btn-primary');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+  try {
+    const { error } = await client.auth.updateUser({ password: pass });
+    if (error) throw error;
+    showAlert('alertAuth', '✓ Contraseña actualizada correctamente. Ya puedes iniciar sesión.', 'success');
+    // Cerrar sesión de recovery y redirigir al login
+    await client.auth.signOut();
+    setTimeout(() => switchAuth('login'), 2500);
+  } catch(e) {
+    showAlert('alertAuth', 'Error: ' + (e?.message || e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Guardar contraseña'; }
+  }
+}
+
+function initPasswordRecoveryListener() {
+  const client = window.SUPABASE?.client?.();
+  if (!client) return;
+  client.auth.onAuthStateChange((event) => {
+    if (event === 'PASSWORD_RECOVERY') {
+      switchAuth('reset');
+    }
+  });
 }
 
 async function fetchProfileByEmail(email) {
