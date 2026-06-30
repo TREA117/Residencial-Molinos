@@ -525,26 +525,6 @@
   </div>
 </div>
 
-<!-- Reset Password (Admin) -->
-<div class="modal-overlay" id="modalResetPassword">
-  <div class="modal" style="max-width:400px">
-    <div class="modal-head"><span class="modal-title">Restablecer contraseña</span><button class="modal-close" onclick="closeModal('modalResetPassword')">✕</button></div>
-    <div class="modal-body">
-      <input type="hidden" id="resetResId">
-      <p id="resetResName" style="font-weight:600;margin:0 0 12px;color:var(--navy)"></p>
-      <div class="field">
-        <label>Nueva contraseña temporal</label>
-        <input type="text" id="resetResPass" placeholder="Mínimo 8 caracteres, número y carácter especial">
-        <div class="field-hint">Comunica esta contraseña al residente por WhatsApp o teléfono. Los valores originales no pueden recuperarse.</div>
-      </div>
-    </div>
-    <div class="modal-foot">
-      <button class="btn btn-secondary" onclick="closeModal('modalResetPassword')">Cancelar</button>
-      <button class="btn btn-gold" onclick="saveResetPassword()">Restablecer</button>
-    </div>
-  </div>
-</div>
-
 <!-- Import CSV -->
 <div class="modal-overlay" id="modalImport">
   <div class="modal">
