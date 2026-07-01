@@ -75,6 +75,7 @@ async function loadDB() {
     if (settingsRow) {
       if (settingsRow.contacts && Object.keys(settingsRow.contacts).length) DB.contacts = settingsRow.contacts;
       if (settingsRow.default_fee != null) DB.settings.defaultFee = settingsRow.default_fee;
+      if (settingsRow.reglamento_url != null) DB.settings.reglamentoUrl = settingsRow.reglamento_url;
     }
 
     console.info('✅ DB cargada desde Supabase', {
@@ -103,6 +104,7 @@ function toDbPayment(obj, currentUser, depto) {
     sent_date:     new Date().toISOString().split('T')[0],
     voucher_url:   obj.voucherUrl || null,
     payment_date:  obj.paymentDate || null,
+    category:      obj.category || 'Mantenimiento',
   };
 }
 

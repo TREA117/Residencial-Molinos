@@ -51,16 +51,19 @@ async function goTo(page) {
   }
 
   const renders = {
-    dashboard:  renderDashboard,
-    residents:  renderResidents,
-    payments:   renderPayments,
-    vouchers:   renderVouchers,
-    finances:   renderFinances,
-    reports:    renderReports,
-    myPayments: renderMyPayments,
-    myAccount:  renderMyAccount,
-    contacts:   renderContacts,
+    dashboard:    renderDashboard,
+    residents:    renderResidents,
+    payments:     renderPayments,
+    vouchers:     renderVouchers,
+    finances:     renderFinances,
+    reports:      renderReports,
+    myPayments:   renderMyPayments,
+    myAccount:    renderMyAccount,
+    contacts:     renderContacts,
     editContacts: renderEditContacts,
+    reglamento:   typeof renderReglamento === 'function' ? renderReglamento : null,
+    fines:        typeof renderFines      === 'function' ? renderFines      : null,
+    myReglamento: renderMyReglamento,
   };
   if (renders[page]) renders[page]();
 }
@@ -244,12 +247,21 @@ function renderMyAccount() {
 
   const area = document.getElementById('accountArea');
   if (!area) return;
+  const pendingFines = myPays.filter(p => p.status === 'pending' && (p.category === 'Multa' || p.category === 'Adeudo') && !p.voucher_url && !p.voucherUrl);
+  const finesAlert = pendingFines.length ? `
+    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem">
+      <div style="font-weight:700;color:#b91c1c;margin-bottom:.5rem">⚠ Tienes ${pendingFines.length} cargo(s) pendiente(s)</div>
+      ${pendingFines.map(p=>`<div style="font-size:13px;color:#7f1d1d;margin-bottom:4px">• <strong>${p.category}</strong>: ${p.description||'—'} — ${fmt(p.amount)} (${p.month||'—'})</div>`).join('')}
+      <div style="font-size:12px;color:#991b1b;margin-top:.5rem">Por favor acércate a administración para regularizar tu situación.</div>
+    </div>` : '';
+
   area.innerHTML = `
     <div class="metrics" style="margin-bottom:1.5rem">
       <div class="metric"><div class="metric-label">Total pagado</div><div class="metric-value" style="color:var(--navy)">${fmt(totalPaid)}</div><div class="metric-change up">${approved.length} pagos aprobados</div></div>
       <div class="metric"><div class="metric-label">En revisión</div><div class="metric-value" style="color:var(--c-amber)">${pending.length}</div><div class="metric-change">comprobantes pendientes</div></div>
       <div class="metric"><div class="metric-label">Cuota mensual</div><div class="metric-value">${fmt(fee)}</div><div class="metric-change">mantenimiento</div></div>
     </div>
+    ${finesAlert}
     <div class="card">
       <div class="card-head"><span class="card-title">Estado de cuenta</span></div>
       <div class="tbl-wrap"><table>
@@ -257,7 +269,7 @@ function renderMyAccount() {
         <tbody>
           ${myPays.sort((a,b)=>new Date(b.sentDate||b.sent_date)-new Date(a.sentDate||a.sent_date)).map(p=>`<tr>
             <td>${p.month||'—'}</td>
-            <td>Cuota de mantenimiento</td>
+            <td>${p.category && p.category !== 'Mantenimiento' ? `<span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}" style="font-size:11px">${p.category}</span> ` : ''}${p.description||'Cuota de mantenimiento'}</td>
             <td>${fmt(p.amount)}</td>
             <td>${p.approvedDate||p.approved_date ? fmtDate(p.approvedDate||p.approved_date) : '—'}</td>
             <td><span class="badge ${p.status==='approved'?'badge-approved':p.status==='pending'?'badge-pending':'badge-rejected'}">${p.status==='approved'?'Pagado':p.status==='pending'?'En revisión':'Rechazado'}</span></td>
@@ -342,7 +354,8 @@ async function savePayment() {
   }
 
   // Guardar registro de pago
-  const payRecord = toDbPayment({ month, amount, voucherUrl, paymentDate }, currentUser, res.depto);
+  const payType = document.getElementById('payType')?.value || 'Mantenimiento';
+  const payRecord = toDbPayment({ month, amount, voucherUrl, paymentDate, category: payType }, currentUser, res.depto);
   try {
     const rows = await window.SUPABASE.insert('payments', payRecord);
     const row = Array.isArray(rows) ? rows[0] : rows;
@@ -632,6 +645,35 @@ function showToast(msg, type = 'success') {
   t.textContent = msg; t.style.opacity = '1';
   if (toastTimer) clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { t.style.opacity = '0'; }, 3500);
+}
+
+/* ── REGLAMENTO (resident view) ──────────────────────────────── */
+function renderMyReglamento() {
+  const area = document.getElementById('myReglamentoArea');
+  if (!area) return;
+  const url = DB.settings.reglamentoUrl;
+  if (!url) {
+    area.innerHTML = `<div class="card" style="text-align:center;padding:2.5rem;color:var(--mist)">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:1rem;opacity:.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <div style="font-size:14px">El reglamento aún no ha sido publicado por la administración.</div>
+    </div>`;
+    return;
+  }
+  const escapedUrl = String(url).replace(/"/g,'&quot;');
+  area.innerHTML = `
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:1.25rem;margin-bottom:1rem">
+      <div style="display:flex;align-items:center;gap:12px">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+        <div>
+          <div style="font-weight:600;color:var(--navy)">Reglamento Interno</div>
+          <div style="font-size:12px;color:var(--mist)">Real Molinos 3 Privada</div>
+        </div>
+      </div>
+      <a href="${escapedUrl}" download="Reglamento-RealMolinos3.pdf" target="_blank" class="btn btn-gold btn-sm">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>Descargar PDF
+      </a>
+    </div>
+    <iframe src="${escapedUrl}" width="100%" height="600" style="border:1px solid var(--gold-light);border-radius:8px;display:block"></iframe>`;
 }
 
 document.querySelectorAll('.modal-overlay').forEach(m => {

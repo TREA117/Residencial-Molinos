@@ -30,7 +30,8 @@ const DB = {
     ]
   },
   settings: {
-    defaultFee: 400
+    defaultFee: 400,
+    reglamentoUrl: null,
   },
   nextId: 100
 };

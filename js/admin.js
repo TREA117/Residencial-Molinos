@@ -352,6 +352,7 @@ async function saveCashPayment() {
   const amount     = parseFloat(document.getElementById('cashAmount').value);
   const payDate    = document.getElementById('cashDate').value;
   const notes      = document.getElementById('cashNotes').value.trim();
+  const category   = document.getElementById('cashType')?.value || 'Mantenimiento';
   if (!residentId || !month || !amount || !payDate) {
     showToast('Completa todos los campos requeridos', 'error'); return;
   }
@@ -362,7 +363,8 @@ async function saveCashPayment() {
   const mm   = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
   const receiptNum = `${yyyy}-${mm}-${resident.depto}`;
-  const desc = `Cuota mantenimiento ${month} — Depto ${resident.depto}`;
+  const descMap = { Mantenimiento: 'Cuota mantenimiento', Multa: 'Multa', Adeudo: 'Adeudo' };
+  const desc = `${descMap[category]||category} ${month} — Depto ${resident.depto}`;
   const today = new Date().toISOString().split('T')[0];
 
   const btn = document.querySelector('#modalCashPayment .btn-gold');
@@ -373,7 +375,7 @@ async function saveCashPayment() {
       resident_id: residentId, resident_name: resident.name,
       depto: resident.depto, month, amount,
       status: 'approved', type: 'income',
-      description: desc, category: 'Mantenimiento',
+      description: desc, category,
       payment_date: payDate, approved_date: today,
       receipt_num: receiptNum,
       notes: notes || 'Pago en efectivo registrado por administración',
@@ -1160,5 +1162,233 @@ async function saveContacts() {
   } catch(e) {
     console.error('No se pudo guardar la configuración en Supabase', e);
     showToast('Se actualizó en pantalla, pero no se pudo guardar permanentemente (¿falta la tabla "settings"?)', 'error');
+  }
+}
+
+/* ── REGLAMENTO (admin) ──────────────────────────────────────── */
+function renderReglamento() {
+  const area = document.getElementById('reglamentoAdminArea');
+  if (!area) return;
+  const url = DB.settings.reglamentoUrl;
+  if (!url) {
+    area.innerHTML = `<div class="card" style="text-align:center;padding:2.5rem;color:var(--mist)">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin-bottom:1rem;opacity:.4"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      <div style="font-size:14px">No hay reglamento cargado aún.<br>Usa el botón "Subir PDF" para agregar uno.</div>
+    </div>`;
+    return;
+  }
+  area.innerHTML = `
+    <div class="card" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:1.25rem">
+      <div style="display:flex;align-items:center;gap:12px">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+        <div>
+          <div style="font-weight:600;color:var(--navy)">Reglamento Interno</div>
+          <div style="font-size:12px;color:var(--mist)">Archivo PDF activo — visible para todos los residentes</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <a href="${escH(url)}" target="_blank" class="btn btn-sm" style="background:var(--gold-light);color:var(--navy)">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>Ver
+        </a>
+        <label class="btn btn-sm btn-secondary" style="cursor:pointer">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Reemplazar
+          <input type="file" accept="application/pdf" style="display:none" onchange="uploadReglamento(this)">
+        </label>
+        <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c" onclick="deleteReglamento()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/></svg>Eliminar
+        </button>
+      </div>
+    </div>
+    <div style="margin-top:1rem">
+      <iframe src="${escH(url)}" width="100%" height="600" style="border:1px solid var(--gold-light);border-radius:8px"></iframe>
+    </div>`;
+}
+
+async function uploadReglamento(input) {
+  const file = input?.files?.[0];
+  if (!file) return;
+  if (file.type !== 'application/pdf') { showToast('Solo se permiten archivos PDF', 'error'); return; }
+  if (file.size > 10 * 1024 * 1024) { showToast('El archivo supera el límite de 10 MB', 'error'); return; }
+
+  const label = document.getElementById('reglamentoUploadLabel');
+  if (label) label.textContent = 'Subiendo...';
+
+  try {
+    const client = window.SUPABASE?.client?.();
+    if (!client) throw new Error('Sin conexión con Supabase');
+
+    // Eliminar versión anterior si existe
+    if (DB.settings.reglamentoUrl) {
+      await client.storage.from('reglamento').remove(['reglamento.pdf']);
+    }
+
+    const { error: upErr } = await client.storage.from('reglamento').upload('reglamento.pdf', file, {
+      contentType: 'application/pdf', upsert: true
+    });
+    if (upErr) throw upErr;
+
+    const { data: { publicUrl } } = client.storage.from('reglamento').getPublicUrl('reglamento.pdf');
+    const url = publicUrl + '?t=' + Date.now();
+
+    const { error: settErr } = await client.from('settings').upsert({
+      id: 1, reglamento_url: publicUrl, contacts: DB.contacts, default_fee: DB.settings.defaultFee
+    });
+    if (settErr) throw settErr;
+
+    DB.settings.reglamentoUrl = publicUrl;
+    showToast('✓ Reglamento subido correctamente');
+    renderReglamento();
+  } catch(e) {
+    console.error('Error al subir el reglamento', e);
+    showToast('Error al subir el PDF: ' + (e?.message||e), 'error');
+  } finally {
+    input.value = '';
+    const lbl = document.getElementById('reglamentoUploadLabel');
+    if (lbl) lbl.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Subir PDF<input type="file" id="reglamentoFile" accept="application/pdf" style="display:none" onchange="uploadReglamento(this)">`;
+  }
+}
+
+async function deleteReglamento() {
+  if (!confirm('¿Eliminar el reglamento actual? Los residentes ya no podrán descargarlo.')) return;
+  try {
+    const client = window.SUPABASE?.client?.();
+    if (!client) throw new Error('Sin conexión con Supabase');
+    await client.storage.from('reglamento').remove(['reglamento.pdf']);
+    const { error } = await client.from('settings').upsert({
+      id: 1, reglamento_url: null, contacts: DB.contacts, default_fee: DB.settings.defaultFee
+    });
+    if (error) throw error;
+    DB.settings.reglamentoUrl = null;
+    showToast('Reglamento eliminado');
+    renderReglamento();
+  } catch(e) {
+    showToast('Error al eliminar: ' + (e?.message||e), 'error');
+  }
+}
+
+/* ── MULTAS Y ADEUDOS (admin) ────────────────────────────────── */
+function renderFines() {
+  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const fines = DB.payments.filter(p => p.resident_id && (p.category === 'Multa' || p.category === 'Adeudo'))
+    .sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''));
+  const tbody = document.getElementById('tblFines');
+  if (!tbody) return;
+  if (!fines.length) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--mist);padding:1.5rem">Sin multas ni adeudos registrados</td></tr>';
+    return;
+  }
+  tbody.innerHTML = fines.map(p => {
+    const badgeClass = p.status === 'approved' ? 'badge-approved' : p.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
+    const badgeLabel = p.status === 'approved' ? 'Pagado' : p.status === 'rejected' ? 'Rechazado' : 'Pendiente';
+    return `<tr>
+      <td>${escH(p.resident_name||p.residentName||'—')}</td>
+      <td><strong>${escH(p.depto||'—')}</strong></td>
+      <td><span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}">${escH(p.category)}</span></td>
+      <td style="max-width:200px;white-space:normal">${escH(p.description||'—')}</td>
+      <td>${fmt(p.amount)}</td>
+      <td>${escH(p.month||'—')}</td>
+      <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
+      <td>
+        ${p.status!=='approved'?`<button class="btn btn-sm btn-gold" onclick="markFinePaid('${escH(p.id)}')">Marcar pagado</button> `:''}
+        <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c" onclick="deleteFine('${escH(p.id)}')">Eliminar</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openAddFineModal() {
+  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const sel = document.getElementById('fineResidentId');
+  sel.innerHTML = DB.residents
+    .filter(r => r.status === 'approved')
+    .sort((a,b) => (a.depto||'').localeCompare(b.depto||''))
+    .map(r => `<option value="${escH(r.id)}">${escH(r.depto)} — ${escH(r.name)}</option>`)
+    .join('');
+  const mSel = document.getElementById('fineMonth');
+  const now = new Date();
+  const opts = [];
+  for (let i = 0; i < 13; i++) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const label = MONTHS[d.getMonth()] + ' ' + d.getFullYear();
+    opts.push(`<option value="${label}"${i===0?' selected':''}>${label}</option>`);
+  }
+  mSel.innerHTML = opts.join('');
+  document.getElementById('fineAmount').value = '';
+  document.getElementById('fineDescription').value = '';
+  document.getElementById('fineType').value = 'Multa';
+  openModal('modalAddFine');
+}
+
+async function saveFine() {
+  const residentId   = document.getElementById('fineResidentId').value;
+  const category     = document.getElementById('fineType').value;
+  const amount       = parseFloat(document.getElementById('fineAmount').value);
+  const month        = document.getElementById('fineMonth').value;
+  const description  = document.getElementById('fineDescription').value.trim();
+  if (!residentId || !amount || !description) {
+    showToast('Completa monto y descripción', 'error'); return;
+  }
+  const resident = DB.residents.find(r => r.id === residentId);
+  if (!resident) { showToast('Residente no encontrado', 'error'); return; }
+
+  const btn = document.querySelector('#modalAddFine .btn-gold');
+  if (btn) { btn.disabled = true; btn.textContent = 'Guardando...'; }
+
+  try {
+    const rows = await window.SUPABASE.insert('payments', {
+      resident_id: residentId, resident_name: resident.name,
+      depto: resident.depto, month, amount,
+      status: 'pending', type: 'income',
+      description, category,
+    });
+    const row = Array.isArray(rows) ? rows[0] : rows;
+    if (!row) throw new Error('Sin respuesta del servidor');
+    if (typeof normalizePayment === 'function') DB.payments.push(normalizePayment(row));
+    else DB.payments.push(row);
+
+    // Notificar al residente
+    try {
+      const msg = `Se registró una ${category.toLowerCase()} en tu cuenta por $${amount}: "${description}". Por favor acércate a administración.`;
+      const notifRows = await window.SUPABASE.insert('notifications', { user_id: residentId, message: msg, is_read: false });
+      const notifRow = Array.isArray(notifRows) ? notifRows[0] : notifRows;
+      if (notifRow && typeof normalizeNotification === 'function') DB.notifications.push(normalizeNotification(notifRow));
+    } catch(ne) { console.warn('No se pudo enviar notificación', ne); }
+
+    closeModal('modalAddFine');
+    renderFines();
+    showToast(`✓ ${category} agregada a Depto ${resident.depto}`);
+  } catch(e) {
+    showToast('Error: ' + (e?.message||e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Agregar cargo'; }
+  }
+}
+
+async function markFinePaid(id) {
+  const p = DB.payments.find(x => x.id === id);
+  if (!p) return;
+  try {
+    const today = new Date().toISOString().split('T')[0];
+    await window.SUPABASE.update('payments', id, { status: 'approved', approved_date: today });
+    p.status = 'approved'; p.approvedDate = today; p.approved_date = today;
+    renderFines();
+    showToast('✓ Cargo marcado como pagado');
+  } catch(e) {
+    showToast('Error: ' + (e?.message||e), 'error');
+  }
+}
+
+async function deleteFine(id) {
+  if (!confirm('¿Eliminar este cargo? Esta acción no se puede deshacer.')) return;
+  try {
+    const client = window.SUPABASE?.client?.();
+    if (!client) throw new Error('Sin conexión con Supabase');
+    const { error } = await client.from('payments').delete().eq('id', id);
+    if (error) throw error;
+    DB.payments = DB.payments.filter(p => p.id !== id);
+    renderFines();
+    showToast('Cargo eliminado');
+  } catch(e) {
+    showToast('Error al eliminar: ' + (e?.message||e), 'error');
   }
 }
