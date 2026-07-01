@@ -251,7 +251,7 @@ function renderMyAccount() {
   const finesAlert = pendingFines.length ? `
     <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem">
       <div style="font-weight:700;color:#b91c1c;margin-bottom:.5rem">⚠ Tienes ${pendingFines.length} cargo(s) pendiente(s)</div>
-      ${pendingFines.map(p=>`<div style="font-size:13px;color:#7f1d1d;margin-bottom:4px">• <strong>${p.category}</strong>: ${p.description||'—'} — ${fmt(p.amount)} (${p.month||'—'})</div>`).join('')}
+      ${pendingFines.map(p=>`<div style="font-size:13px;color:#7f1d1d;margin-bottom:4px">• <strong>${escH(p.category)}</strong>: ${escH(p.description||'—')} — ${fmt(p.amount)} (${escH(p.month||'—')})</div>`).join('')}
       <div style="font-size:12px;color:#991b1b;margin-top:.5rem">Por favor acércate a administración para regularizar tu situación.</div>
     </div>` : '';
 
@@ -269,7 +269,7 @@ function renderMyAccount() {
         <tbody>
           ${myPays.sort((a,b)=>new Date(b.sentDate||b.sent_date)-new Date(a.sentDate||a.sent_date)).map(p=>`<tr>
             <td>${p.month||'—'}</td>
-            <td>${p.category && p.category !== 'Mantenimiento' ? `<span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}" style="font-size:11px">${p.category}</span> ` : ''}${p.description||'Cuota de mantenimiento'}</td>
+            <td>${p.category && p.category !== 'Mantenimiento' ? `<span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}" style="font-size:11px">${escH(p.category)}</span> ` : ''}${escH(p.description||'Cuota de mantenimiento')}</td>
             <td>${fmt(p.amount)}</td>
             <td>${p.approvedDate||p.approved_date ? fmtDate(p.approvedDate||p.approved_date) : '—'}</td>
             <td><span class="badge ${p.status==='approved'?'badge-approved':p.status==='pending'?'badge-pending':'badge-rejected'}">${p.status==='approved'?'Pagado':p.status==='pending'?'En revisión':'Rechazado'}</span></td>
