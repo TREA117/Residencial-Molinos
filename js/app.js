@@ -247,45 +247,43 @@ function renderMyAccount() {
 
   const area = document.getElementById('accountArea');
   if (!area) return;
-  const pendingFines = myPays.filter(p => p.status === 'pending' && (p.category === 'Multa' || p.category === 'Adeudo') && !p.voucher_url && !p.voucherUrl);
-  const finesAlert = pendingFines.length ? `
-    <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:10px;padding:1rem 1.25rem;margin-bottom:1.5rem">
-      <div style="font-weight:700;color:#b91c1c;margin-bottom:.5rem">⚠ Tienes ${pendingFines.length} cargo(s) pendiente(s)</div>
-      ${pendingFines.map(p=>`<div style="font-size:13px;color:#7f1d1d;margin-bottom:4px">• <strong>${escH(p.category)}</strong>: ${escH(p.description||'—')} — ${fmt(p.amount)} (${escH(p.month||'—')})</div>`).join('')}
-      <div style="font-size:12px;color:#991b1b;margin-top:.5rem">Por favor acércate a administración para regularizar tu situación.</div>
-    </div>` : '';
+  const isFineCharge = p => (p.category === 'Multa' || p.category === 'Adeudo') && !p.voucher_url && !p.voucherUrl;
+  const pendingFines = myPays.filter(p => p.status === 'pending' && isFineCharge(p));
+  const pendingFinesTotal = pendingFines.reduce((s,p) => s + Number(p.amount||0), 0);
+  const totalOwed = fee + pendingFinesTotal;
+
+  function statusLabel(p) {
+    if (p.status === 'approved') return ['badge-approved', 'Pagado'];
+    if (p.status === 'rejected') return ['badge-rejected', 'Rechazado'];
+    if (isFineCharge(p)) return ['badge-rejected', 'Pendiente de pago'];
+    return ['badge-pending', 'En revisión'];
+  }
 
   area.innerHTML = `
     <div class="metrics" style="margin-bottom:1.5rem">
       <div class="metric"><div class="metric-label">Total pagado</div><div class="metric-value" style="color:var(--navy)">${fmt(totalPaid)}</div><div class="metric-change up">${approved.length} pagos aprobados</div></div>
       <div class="metric"><div class="metric-label">En revisión</div><div class="metric-value" style="color:var(--c-amber)">${pending.length}</div><div class="metric-change">comprobantes pendientes</div></div>
       <div class="metric"><div class="metric-label">Cuota mensual</div><div class="metric-value">${fmt(fee)}</div><div class="metric-change">mantenimiento</div></div>
+      ${pendingFinesTotal > 0 ? `<div class="metric" style="border-left:3px solid #dc2626"><div class="metric-label" style="color:#dc2626">Total adeudado este mes</div><div class="metric-value" style="color:#dc2626">${fmt(totalOwed)}</div><div class="metric-change">cuota + ${pendingFines.length} cargo(s) pendiente(s)</div></div>` : ''}
     </div>
-    ${finesAlert}
     <div class="card">
       <div class="card-head"><span class="card-title">Estado de cuenta</span></div>
       <div class="tbl-wrap"><table>
-        <thead><tr><th>Mes</th><th>Concepto</th><th>Monto</th><th>Fecha pago</th><th>Estado</th><th>Recibo</th></tr></thead>
+        <thead><tr><th>Mes</th><th>Concepto</th><th>Monto</th><th>Fecha</th><th>Estado</th><th>Recibo</th></tr></thead>
         <tbody>
-          ${myPays.sort((a,b)=>new Date(b.sentDate||b.sent_date)-new Date(a.sentDate||a.sent_date)).map(p=>`<tr>
-            <td>${escH(p.month||'—')}</td>
-            <td>${p.category && p.category !== 'Mantenimiento' ? `<span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}" style="font-size:11px">${escH(p.category)}</span> ` : ''}${escH(p.description||'Cuota de mantenimiento')}</td>
-            <td>${fmt(p.amount)}</td>
-            <td>${p.approvedDate||p.approved_date ? fmtDate(p.approvedDate||p.approved_date) : '—'}</td>
-            <td><span class="badge ${p.status==='approved'?'badge-approved':p.status==='pending'?'badge-pending':'badge-rejected'}">${p.status==='approved'?'Pagado':p.status==='pending'?'En revisión':'Rechazado'}</span></td>
-            <td>${(p.receiptNum||p.receipt_num)?`<button class="btn btn-secondary btn-sm" onclick="showReceipt(${p.id})">${p.receiptNum||p.receipt_num}</button>`:'—'}</td>
-          </tr>`).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin movimientos</td></tr>'}
+          ${myPays.sort((a,b)=>new Date(b.sentDate||b.sent_date)-new Date(a.sentDate||a.sent_date)).map(p=>{
+            const [badgeCls, label] = statusLabel(p);
+            return `<tr>
+              <td>${escH(p.month||'—')}</td>
+              <td>${p.category && p.category !== 'Mantenimiento' ? `<span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}" style="font-size:11px">${escH(p.category)}</span> ` : ''}${escH(p.description||'Cuota de mantenimiento')}</td>
+              <td>${fmt(p.amount)}</td>
+              <td>${p.approvedDate||p.approved_date ? fmtDate(p.approvedDate||p.approved_date) : p.sentDate||p.sent_date ? fmtDate(p.sentDate||p.sent_date) : '—'}</td>
+              <td><span class="badge ${badgeCls}">${label}</span></td>
+              <td>${(p.receiptNum||p.receipt_num)?`<button class="btn btn-secondary btn-sm" onclick="showReceipt(${p.id})">${escH(p.receiptNum||p.receipt_num)}</button>`:'—'}</td>
+            </tr>`;
+          }).join('')||'<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin movimientos</td></tr>'}
         </tbody>
       </table></div>
-    </div>
-    <div style="margin-top:2rem;padding-top:1.5rem;border-top:1px solid var(--gold-light)">
-      <p style="font-size:.85rem;color:var(--mist);margin:0 0 .75rem">Zona de peligro</p>
-      <button id="btn-delete-account"
-        onclick="deleteAccountWeb()"
-        style="background:#fff;color:#c0392b;border:1.5px solid #c0392b;border-radius:8px;
-               padding:.6rem 1.25rem;font-size:.9rem;cursor:pointer;font-family:inherit;font-weight:600">
-        Eliminar mi cuenta
-      </button>
     </div>`;
 }
 
@@ -416,11 +414,19 @@ function renderContacts() {
       </div>
     </div>
     <!-- Emergencias -->
-    <div class="card" style="padding:1.25rem">
+    <div class="card" style="padding:1.25rem;margin-bottom:1rem">
       <div style="font-size:13px;font-weight:600;color:var(--navy);margin-bottom:10px">Números de emergencia</div>
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px">
         ${c.emergency.map(e=>`<a href="tel:${e.number}" class="emerg-btn ${e.color}"><div><div class="eb-num">${e.label}</div><div class="eb-label">${e.desc}</div></div></a>`).join('')}
       </div>
+    </div>
+    <div class="card" style="padding:1.25rem">
+      <div style="font-size:13px;font-weight:600;color:var(--mist);margin-bottom:.75rem">Zona de peligro</div>
+      <button onclick="deleteAccountWeb()"
+        style="background:#fff;color:#c0392b;border:1.5px solid #c0392b;border-radius:8px;
+               padding:.6rem 1.25rem;font-size:.9rem;cursor:pointer;font-family:inherit;font-weight:600">
+        Eliminar mi cuenta
+      </button>
     </div>`;
 }
 
