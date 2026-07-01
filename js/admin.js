@@ -375,7 +375,7 @@ async function saveCashPayment() {
       status: 'approved', type: 'income',
       description: desc, category: 'Mantenimiento',
       payment_date: payDate, approved_date: today,
-      receipt_num: receiptNum, has_voucher: false,
+      receipt_num: receiptNum,
       notes: notes || 'Pago en efectivo registrado por administración',
     });
     const row = Array.isArray(rows) ? rows[0] : rows;
