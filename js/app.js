@@ -160,7 +160,7 @@ function renderMyPayments() {
     tbody.innerHTML = myPays
       .sort((a, b) => new Date(b.sentDate||b.sent_date) - new Date(a.sentDate||a.sent_date))
       .map(p => `<tr>
-        <td>${p.month||'—'}</td>
+        <td>${escH(p.month||'—')}</td>
         <td>${fmt(p.amount)}</td>
         <td>${p.paymentDate || p.payment_date ? fmtDate(p.paymentDate||p.payment_date) : '—'}</td>
         <td>${fmtDate(p.sentDate||p.sent_date)}</td>
@@ -268,7 +268,7 @@ function renderMyAccount() {
         <thead><tr><th>Mes</th><th>Concepto</th><th>Monto</th><th>Fecha pago</th><th>Estado</th><th>Recibo</th></tr></thead>
         <tbody>
           ${myPays.sort((a,b)=>new Date(b.sentDate||b.sent_date)-new Date(a.sentDate||a.sent_date)).map(p=>`<tr>
-            <td>${p.month||'—'}</td>
+            <td>${escH(p.month||'—')}</td>
             <td>${p.category && p.category !== 'Mantenimiento' ? `<span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}" style="font-size:11px">${escH(p.category)}</span> ` : ''}${escH(p.description||'Cuota de mantenimiento')}</td>
             <td>${fmt(p.amount)}</td>
             <td>${p.approvedDate||p.approved_date ? fmtDate(p.approvedDate||p.approved_date) : '—'}</td>
