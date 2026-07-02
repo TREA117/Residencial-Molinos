@@ -608,7 +608,7 @@ async function deletePayment(id, folderDepto) {
         const { data: rmData, error: rmError } = await client.storage.from('comprobantes').remove([path]);
         console.info('Eliminar comprobante storage', { path, rmData, rmError });
         if (rmError) throw new Error('No se pudo eliminar el comprobante del storage (ruta: '+path+'): '+(rmError.message||rmError));
-        if (!rmData || rmData.length === 0) throw new Error('El comprobante no se encontró en el storage (ruta: '+path+'). Verifica el bucket "comprobantes".');
+        if (!rmData || rmData.length === 0) console.warn('Comprobante no encontrado en storage (ruta: '+path+'), continuando con eliminación del registro.');
       }
     }
     if (client && receiptUrl) {
@@ -617,7 +617,7 @@ async function deletePayment(id, folderDepto) {
         const { data: rmData, error: rmError } = await client.storage.from('recibos').remove([path]);
         console.info('Eliminar recibo storage', { path, rmData, rmError });
         if (rmError) throw new Error('No se pudo eliminar el recibo del storage (ruta: '+path+'): '+(rmError.message||rmError));
-        if (!rmData || rmData.length === 0) throw new Error('El recibo no se encontró en el storage (ruta: '+path+'). Verifica el bucket "recibos".');
+        if (!rmData || rmData.length === 0) console.warn('Recibo no encontrado en storage (ruta: '+path+'), continuando con eliminación del registro.');
       }
     }
     await window.SUPABASE.remove('payments', id);
