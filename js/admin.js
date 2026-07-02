@@ -286,9 +286,11 @@ async function saveNewResident() {
 /* ── PAYMENTS / VOUCHERS (admin) ───────────────────────────── */
 function renderPayments() {
   const depto     = document.getElementById('filterPayDepto')?.value||'';
-  // Excluir multas/adeudos sin comprobante — esos los gestiona el admin en "Multas / Adeudos", no aquí
-  const isAdminCharge = p => (p.category === 'Multa' || p.category === 'Adeudo') && !p.voucher_url && !p.voucherUrl;
-  const residentPays = DB.payments.filter(p => (p.residentId||p.resident_id) && !isAdminCharge(p));
+  // Multas y adeudos se gestionan en "Multas / Adeudos", no en Comprobantes
+  const residentPays = DB.payments.filter(p =>
+    (p.residentId||p.resident_id) &&
+    p.category !== 'Multa' && p.category !== 'Adeudo'
+  );
   const pending   = residentPays.filter(p=>p.status==='pending');
   const all       = residentPays.filter(p=>p.status!=='rejected').filter(p=>!depto||p.depto===depto);
   const ppb = document.getElementById('payPendingBadge');
@@ -346,7 +348,40 @@ function openCashPaymentModal() {
   document.getElementById('cashAmount').value = DB.settings?.defaultFee || 400;
   document.getElementById('cashDate').value   = now.toISOString().split('T')[0];
   document.getElementById('cashNotes').value  = '';
+  document.getElementById('cashType').value   = 'Mantenimiento';
+  document.getElementById('cashFineSection')?.classList.add('hidden');
   openModal('modalCashPayment');
+}
+
+function onCashTypeChange() {
+  const type = document.getElementById('cashType').value;
+  const section = document.getElementById('cashFineSection');
+  if (type === 'Multa' || type === 'Adeudo') {
+    section?.classList.remove('hidden');
+    _populateCashFineSelect();
+  } else {
+    section?.classList.add('hidden');
+  }
+}
+
+function onCashResidentChange() {
+  const type = document.getElementById('cashType')?.value;
+  if (type === 'Multa' || type === 'Adeudo') _populateCashFineSelect();
+}
+
+function _populateCashFineSelect() {
+  const residentId = document.getElementById('cashResidentId')?.value;
+  const type = document.getElementById('cashType')?.value;
+  const sel = document.getElementById('cashLinkedFineId');
+  if (!sel) return;
+  const fines = DB.payments.filter(p =>
+    (p.resident_id === residentId || p.residentId === residentId) &&
+    (p.category === 'Multa' || p.category === 'Adeudo') &&
+    p.status === 'pending' &&
+    (!type || p.category === type)
+  );
+  sel.innerHTML = '<option value="">— Pago independiente —</option>' +
+    fines.map(f => `<option value="${escH(String(f.id))}">${escH(f.category)} — ${escH(f.month)} — $${Number(f.amount).toFixed(2)} — ${escH(f.description||'')}</option>`).join('');
 }
 
 async function saveCashPayment() {
@@ -406,8 +441,15 @@ async function saveCashPayment() {
       if (notifRow && typeof normalizeNotification === 'function') DB.notifications.push(normalizeNotification(notifRow));
     } catch(ne) { console.warn('No se pudo crear la notificación', ne); }
 
+    // Si hay un cargo (multa/adeudo) vinculado, descontar el pago
+    const linkedFineId = document.getElementById('cashLinkedFineId')?.value;
+    if (linkedFineId) {
+      await _applyPaymentToFine(linkedFineId, amount);
+    }
+
     closeModal('modalCashPayment');
     renderPayments();
+    renderFines();
     showToast('✓ Pago registrado — Recibo ' + receiptNum);
     showReceipt(p.id);
 
@@ -459,6 +501,20 @@ async function approvePayment(id) {
 
   renderPayments();
   updatePendingCounts();
+
+  // Si el comprobante aprobado corresponde a una multa/adeudo, descontar del cargo pendiente
+  if (p.category === 'Multa' || p.category === 'Adeudo') {
+    const rid = p.resident_id || p.residentId;
+    const linkedFine = DB.payments.find(f =>
+      String(f.id) !== String(id) &&
+      (f.resident_id === rid || f.residentId === rid) &&
+      f.category === p.category &&
+      f.status === 'pending' &&
+      !f.voucher_url && !f.voucherUrl
+    );
+    if (linkedFine) await _applyPaymentToFine(linkedFine.id, p.amount);
+  }
+
   showToast('✓ Pago aprobado — Recibo '+receiptNum+' generado');
 
   // Generar y subir el recibo a Storage de inmediato, para que quede
@@ -1367,15 +1423,62 @@ async function saveFine() {
   }
 }
 
+// Descuenta `amount` del cargo (multa/adeudo) con ese id.
+// Si el restante es <= 0, elimina el cargo completo.
+async function _applyPaymentToFine(fineId, amount) {
+  const fine = DB.payments.find(x => String(x.id) === String(fineId));
+  if (!fine) return;
+  const client = window.SUPABASE?.client?.();
+  if (!client) return;
+  const remaining = Number(fine.amount) - Number(amount);
+  try {
+    if (remaining <= 0) {
+      const { error } = await client.from('payments').delete().eq('id', fineId);
+      if (error) throw error;
+      DB.payments = DB.payments.filter(x => String(x.id) !== String(fineId));
+    } else {
+      await window.SUPABASE.update('payments', fineId, { amount: remaining });
+      fine.amount = remaining;
+    }
+    renderFines();
+    if (typeof renderMyAccount === 'function') renderMyAccount();
+  } catch(e) {
+    console.warn('_applyPaymentToFine error', e);
+  }
+}
+
 async function markFinePaid(id) {
-  const p = DB.payments.find(x => x.id === id);
+  const p = DB.payments.find(x => String(x.id) === String(id));
   if (!p) return;
+  const client = window.SUPABASE?.client?.();
+  if (!client) { showToast('Sin conexión', 'error'); return; }
   try {
     const today = new Date().toISOString().split('T')[0];
-    await window.SUPABASE.update('payments', id, { status: 'approved', approved_date: today });
-    p.status = 'approved'; p.approvedDate = today; p.approved_date = today;
+    // Eliminar el cargo original
+    const { error: delErr } = await client.from('payments').delete().eq('id', id);
+    if (delErr) throw delErr;
+    // Crear ingreso con los datos del cargo
+    const incomeRows = await window.SUPABASE.insert('payments', {
+      resident_id:   p.resident_id || p.residentId,
+      resident_name: p.resident_name || p.residentName,
+      depto:         p.depto,
+      month:         p.month,
+      amount:        p.amount,
+      status:        'approved',
+      type:          'income',
+      category:      p.category,
+      description:   p.description || (p.category + ' ' + p.month),
+      payment_date:  today,
+      approved_date: today,
+      notes:         'Registrado como pagado desde Multas / Adeudos',
+    });
+    DB.payments = DB.payments.filter(x => String(x.id) !== String(id));
+    const row = Array.isArray(incomeRows) ? incomeRows[0] : incomeRows;
+    if (row) DB.payments.push(typeof normalizePayment === 'function' ? normalizePayment(row) : row);
     renderFines();
-    showToast('✓ Cargo marcado como pagado');
+    if (typeof renderFinances === 'function') renderFinances();
+    updatePendingCounts();
+    showToast('✓ Cargo pagado — ingreso registrado en Ingresos/Egresos');
   } catch(e) {
     showToast('Error: ' + (e?.message||e), 'error');
   }
@@ -1450,11 +1553,6 @@ async function checkAndApplyLateFees() {
       if (row) {
         DB.payments.push(typeof normalizePayment === 'function' ? normalizePayment(row) : row);
         applied++;
-        window.SUPABASE.insert('notifications', {
-          user_id: rid,
-          message: `Se aplicó un recargo de $50 por pago tardío del mes de ${currentMonthStr}. Regulariza tu pago a la brevedad.`,
-          is_read: false,
-        }).catch(() => {});
       }
     } catch(e) {
       console.error('Error al aplicar recargo a depto', resident.depto, e);

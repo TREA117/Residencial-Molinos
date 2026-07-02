@@ -584,13 +584,16 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-head"><span class="modal-title">Registrar pago en efectivo</span><button class="modal-close" onclick="closeModal('modalCashPayment')">✕</button></div>
     <div class="modal-body">
-      <div class="field"><label>Residente</label><select id="cashResidentId"></select></div>
+      <div class="field"><label>Residente</label><select id="cashResidentId" onchange="onCashResidentChange()"></select></div>
       <div class="field"><label>Tipo de cargo</label>
-        <select id="cashType">
+        <select id="cashType" onchange="onCashTypeChange()">
           <option value="Mantenimiento">Mantenimiento mensual</option>
           <option value="Multa">Multa</option>
           <option value="Adeudo">Adeudo</option>
         </select>
+      </div>
+      <div id="cashFineSection" class="hidden">
+        <div class="field"><label>Cargo pendiente a saldar</label><select id="cashLinkedFineId"><option value="">— Pago independiente —</option></select><div class="field-hint">Selecciona el cargo al que aplica este pago (opcional)</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
         <div class="field"><label>Mes de pago</label><select id="cashMonth"></select></div>
@@ -692,6 +695,6 @@
 <script src="js/data.js?v=20260701"></script>
 <script src="js/auth.js?v=20260702"></script>
 <script src="js/app.js?v=20260701"></script>
-<script src="js/admin.js?v=20260702"></script>
+<script src="js/admin.js?v=20260703"></script>
 </body>
 </html>
