@@ -8,7 +8,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&display=swap">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js" defer></script>
 <link rel="stylesheet" href="css/styles.css?v=20260702">
 </head>
 <body>
@@ -37,8 +37,8 @@
 
       <!-- LOGIN -->
       <div id="formLogin">
-        <div class="field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="tu@correo.com"></div>
-        <div class="field"><label>Contraseña</label><div class="pass-wrap"><input type="password" id="loginPass" placeholder="••••••••"><button type="button" class="pass-toggle" onclick="togglePassVis('loginPass',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <div class="field"><label for="loginEmail">Correo electrónico</label><input type="email" id="loginEmail" placeholder="tu@correo.com"></div>
+        <div class="field"><label for="loginPass">Contraseña</label><div class="pass-wrap"><input type="password" id="loginPass" placeholder="••••••••"><button type="button" class="pass-toggle" onclick="togglePassVis('loginPass',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
         <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar</button>
         <button class="btn btn-ghost btn-full" onclick="switchAuth('forgot')" style="margin-top:6px;font-size:13px">¿Olvidaste tu contraseña?</button>
       </div>
@@ -46,7 +46,7 @@
       <!-- FORGOT PASSWORD -->
       <div id="formForgotPassword" class="hidden">
         <p style="font-size:13px;margin:0 0 12px;color:var(--slate)">Te enviaremos un enlace de recuperación a tu correo electrónico.</p>
-        <div class="field"><label>Correo electrónico</label><input type="email" id="forgotEmail" placeholder="tu@correo.com"></div>
+        <div class="field"><label for="forgotEmail">Correo electrónico</label><input type="email" id="forgotEmail" placeholder="tu@correo.com"></div>
         <button class="btn btn-primary btn-full" onclick="doForgotPassword()">Enviar enlace</button>
         <button class="btn btn-ghost btn-full" onclick="switchAuth('login')" style="margin-top:6px;font-size:13px">← Volver al inicio de sesión</button>
       </div>
@@ -54,7 +54,7 @@
       <!-- RESET PASSWORD (desde enlace de correo) -->
       <div id="formResetPassword" class="hidden">
         <p style="font-size:13px;margin:0 0 12px;color:var(--slate)">Ingresa tu nueva contraseña.</p>
-        <div class="field"><label>Nueva contraseña</label><input type="password" id="newPassReset" placeholder="Mínimo 8 caracteres">
+        <div class="field"><label for="newPassReset">Nueva contraseña</label><input type="password" id="newPassReset" placeholder="Mínimo 8 caracteres">
           <div class="field-hint">Mínimo 8 caracteres, al menos un número y un carácter especial (ej. !, @, #, $)</div>
         </div>
         <button class="btn btn-primary btn-full" onclick="doSetNewPassword()">Guardar contraseña</button>
@@ -62,17 +62,17 @@
 
       <!-- REGISTER -->
       <div id="formRegister" class="hidden">
-        <div class="field"><label>Nombre completo</label><input type="text" id="regName" placeholder="Juan García Pérez"></div>
-        <div class="field"><label>Correo electrónico</label><input type="email" id="regEmail" placeholder="tu@correo.com"></div>
-        <div class="field"><label>Número de celular</label><input type="tel" id="regPhone" placeholder="555 000 0000"></div>
+        <div class="field"><label for="regName">Nombre completo</label><input type="text" id="regName" placeholder="Juan García Pérez"></div>
+        <div class="field"><label for="regEmail">Correo electrónico</label><input type="email" id="regEmail" placeholder="tu@correo.com"></div>
+        <div class="field"><label for="regPhone">Número de celular</label><input type="tel" id="regPhone" placeholder="555 000 0000"></div>
         <div class="field">
-          <label>Número de departamento</label>
+          <label for="regDepto">Número de departamento</label>
           <input type="text" id="regDepto" placeholder="10H" style="text-transform:uppercase"
                  oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')">
           <div class="field-hint">⚠️ Escribe tu departamento en MAYÚSCULAS y SIN ESPACIOS. Ejemplo: 10H, 7E, 2B</div>
         </div>
-        <div class="field"><label>Contraseña</label><div class="pass-wrap"><input type="password" id="regPass" placeholder="Mínimo 8 caracteres"><button type="button" class="pass-toggle" onclick="togglePassVis('regPass',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div><div class="field-hint">Mínimo 8 caracteres, al menos un número y un carácter especial (ej. !, @, #, $)</div></div>
-        <div class="field"><label>Confirmar contraseña</label><div class="pass-wrap"><input type="password" id="regPassConfirm" placeholder="Repite tu contraseña"><button type="button" class="pass-toggle" onclick="togglePassVis('regPassConfirm',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <div class="field"><label for="regPass">Contraseña</label><div class="pass-wrap"><input type="password" id="regPass" placeholder="Mínimo 8 caracteres"><button type="button" class="pass-toggle" onclick="togglePassVis('regPass',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div><div class="field-hint">Mínimo 8 caracteres, al menos un número y un carácter especial (ej. !, @, #, $)</div></div>
+        <div class="field"><label for="regPassConfirm">Confirmar contraseña</label><div class="pass-wrap"><input type="password" id="regPassConfirm" placeholder="Repite tu contraseña"><button type="button" class="pass-toggle" onclick="togglePassVis('regPassConfirm',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
         <button class="btn btn-primary btn-full" onclick="doRegister()">Solicitar acceso</button>
         <p style="font-size:11px;color:var(--mist);text-align:center;margin-top:10px">Al registrarte, administración recibirá una notificación para autorizar tu acceso.</p>
       </div>
@@ -434,17 +434,17 @@
     <div class="modal-body">
       <input type="hidden" id="transType" value="income">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Fecha</label><input type="date" id="transDate"></div>
-        <div class="field"><label>Monto (MXN)</label><input type="number" id="transAmount" placeholder="1500.00" step="0.01"></div>
+        <div class="field"><label for="transDate">Fecha</label><input type="date" id="transDate"></div>
+        <div class="field"><label for="transAmount">Monto (MXN)</label><input type="number" id="transAmount" placeholder="1500.00" step="0.01"></div>
       </div>
-      <div class="field"><label>Descripción</label><input type="text" id="transDesc" placeholder="Cuota mantenimiento depto 10H"></div>
+      <div class="field"><label for="transDesc">Descripción</label><input type="text" id="transDesc" placeholder="Cuota mantenimiento depto 10H"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Categoría</label>
+        <div class="field"><label for="transCat">Categoría</label>
           <select id="transCat"><option>Mantenimiento</option><option>Limpieza</option><option>Seguridad</option><option>Reparaciones</option><option>Servicios</option><option>Administración</option><option>Otros</option></select>
         </div>
-        <div class="field"><label>Referencia / Factura</label><input type="text" id="transRef" placeholder="REF-001"></div>
+        <div class="field"><label for="transRef">Referencia / Factura</label><input type="text" id="transRef" placeholder="REF-001"></div>
       </div>
-      <div class="field"><label>Notas (opcional)</label><textarea id="transNotes" placeholder="Información adicional..."></textarea></div>
+      <div class="field"><label for="transNotes">Notas (opcional)</label><textarea id="transNotes" placeholder="Información adicional..."></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modalTransaction')">Cancelar</button>
@@ -460,21 +460,21 @@
     <div class="modal-body">
       <input type="hidden" id="editTransId">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Fecha</label><input type="date" id="editTransDate"></div>
-        <div class="field"><label>Tipo</label>
+        <div class="field"><label for="editTransDate">Fecha</label><input type="date" id="editTransDate"></div>
+        <div class="field"><label for="editTransType">Tipo</label>
           <select id="editTransType"><option value="income">Ingreso</option><option value="expense">Egreso</option></select>
         </div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Proveedor</label><input type="text" id="editTransProvider" placeholder="(opcional)"></div>
-        <div class="field"><label>Monto (MXN)</label><input type="number" id="editTransAmount" step="0.01"></div>
+        <div class="field"><label for="editTransProvider">Proveedor</label><input type="text" id="editTransProvider" placeholder="(opcional)"></div>
+        <div class="field"><label for="editTransAmount">Monto (MXN)</label><input type="number" id="editTransAmount" step="0.01"></div>
       </div>
-      <div class="field"><label>Concepto</label><input type="text" id="editTransDesc"></div>
+      <div class="field"><label for="editTransDesc">Concepto</label><input type="text" id="editTransDesc"></div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Categoría</label><input type="text" id="editTransCat" placeholder="(opcional)"></div>
-        <div class="field"><label>Referencia / Factura</label><input type="text" id="editTransRef" placeholder="(opcional)"></div>
+        <div class="field"><label for="editTransCat">Categoría</label><input type="text" id="editTransCat" placeholder="(opcional)"></div>
+        <div class="field"><label for="editTransRef">Referencia / Factura</label><input type="text" id="editTransRef" placeholder="(opcional)"></div>
       </div>
-      <div class="field"><label>Notas (opcional)</label><textarea id="editTransNotes"></textarea></div>
+      <div class="field"><label for="editTransNotes">Notas (opcional)</label><textarea id="editTransNotes"></textarea></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modalEditTransaction')">Cancelar</button>
@@ -488,7 +488,7 @@
   <div class="modal">
     <div class="modal-head"><span class="modal-title">Subir comprobante de pago</span><button class="modal-close" onclick="closeModal('modalUploadPayment')">✕</button></div>
     <div class="modal-body">
-      <div class="field"><label>Tipo de pago</label>
+      <div class="field"><label for="payType">Tipo de pago</label>
         <select id="payType">
           <option value="Mantenimiento">Mantenimiento mensual</option>
           <option value="Multa">Multa</option>
@@ -496,12 +496,12 @@
         </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Mes de pago</label>
+        <div class="field"><label for="payMonth">Mes de pago</label>
           <select id="payMonth"></select>
         </div>
-        <div class="field"><label>Monto pagado (MXN)</label><input type="number" id="payAmount" placeholder="1500.00"></div>
+        <div class="field"><label for="payAmount">Monto pagado (MXN)</label><input type="number" id="payAmount" placeholder="1500.00"></div>
       </div>
-      <div class="field"><label>Fecha en que realizaste el pago</label><input type="date" id="payDate"></div>
+      <div class="field"><label for="payDate">Fecha en que realizaste el pago</label><input type="date" id="payDate"></div>
       <div class="field">
         <label>Comprobante (imagen o PDF) *</label>
         <div class="upload-zone" onclick="simulateUpload()">
@@ -534,14 +534,14 @@
     <div class="modal-head"><span class="modal-title">Agregar residente</span><button class="modal-close" onclick="closeModal('modalAddResident')">✕</button></div>
     <div class="modal-body">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Nombre completo</label><input type="text" id="newResName" placeholder="Juan García"></div>
-        <div class="field"><label>Departamento</label><input type="text" id="newResDepto" placeholder="10H" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')"></div>
+        <div class="field"><label for="newResName">Nombre completo</label><input type="text" id="newResName" placeholder="Juan García"></div>
+        <div class="field"><label for="newResDepto">Departamento</label><input type="text" id="newResDepto" placeholder="10H" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Correo</label><input type="email" id="newResEmail" placeholder="juan@correo.com"></div>
-        <div class="field"><label>Teléfono</label><input type="tel" id="newResPhone" placeholder="555 000 0000"></div>
+        <div class="field"><label for="newResEmail">Correo</label><input type="email" id="newResEmail" placeholder="juan@correo.com"></div>
+        <div class="field"><label for="newResPhone">Teléfono</label><input type="tel" id="newResPhone" placeholder="555 000 0000"></div>
       </div>
-      <div class="field"><label>Estado</label>
+      <div class="field"><label for="newResStatus">Estado</label>
         <select id="newResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option></select>
       </div>
       <div style="font-size:11px;color:var(--mist)">La cuota mensual ($400) es la misma para todos los residentes y se controla desde Editar contactos.</div>
@@ -560,14 +560,14 @@
     <div class="modal-body">
       <input type="hidden" id="editResId">
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Nombre</label><input type="text" id="editResName"></div>
-        <div class="field"><label>Departamento</label><input type="text" id="editResDepto" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')"></div>
+        <div class="field"><label for="editResName">Nombre</label><input type="text" id="editResName"></div>
+        <div class="field"><label for="editResDepto">Departamento</label><input type="text" id="editResDepto" style="text-transform:uppercase" oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')"></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Correo</label><input type="email" id="editResEmail"></div>
-        <div class="field"><label>Teléfono</label><input type="tel" id="editResPhone"></div>
+        <div class="field"><label for="editResEmail">Correo</label><input type="email" id="editResEmail"></div>
+        <div class="field"><label for="editResPhone">Teléfono</label><input type="tel" id="editResPhone"></div>
       </div>
-      <div class="field"><label>Estado</label>
+      <div class="field"><label for="editResStatus">Estado</label>
         <select id="editResStatus"><option value="approved">Autorizado</option><option value="pending">Pendiente</option><option value="rejected">Rechazado</option></select>
       </div>
       <div style="font-size:11px;color:var(--mist)">La cuota mensual ($400) es la misma para todos los residentes y se controla desde Editar contactos.</div>
@@ -584,8 +584,8 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-head"><span class="modal-title">Registrar pago en efectivo</span><button class="modal-close" onclick="closeModal('modalCashPayment')">✕</button></div>
     <div class="modal-body">
-      <div class="field"><label>Residente</label><select id="cashResidentId" onchange="onCashResidentChange()"></select></div>
-      <div class="field"><label>Tipo de cargo</label>
+      <div class="field"><label for="cashResidentId">Residente</label><select id="cashResidentId" onchange="onCashResidentChange()"></select></div>
+      <div class="field"><label for="cashType">Tipo de cargo</label>
         <select id="cashType" onchange="onCashTypeChange()">
           <option value="Mantenimiento">Mantenimiento mensual</option>
           <option value="Multa">Multa</option>
@@ -593,14 +593,14 @@
         </select>
       </div>
       <div id="cashFineSection" class="hidden">
-        <div class="field"><label>Cargo pendiente a saldar</label><select id="cashLinkedFineId"><option value="">— Pago independiente —</option></select><div class="field-hint">Selecciona el cargo al que aplica este pago (opcional)</div></div>
+        <div class="field"><label for="cashLinkedFineId">Cargo pendiente a saldar</label><select id="cashLinkedFineId"><option value="">— Pago independiente —</option></select><div class="field-hint">Selecciona el cargo al que aplica este pago (opcional)</div></div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Mes de pago</label><select id="cashMonth"></select></div>
-        <div class="field"><label>Monto ($)</label><input type="number" id="cashAmount" min="1" step="0.01"></div>
+        <div class="field"><label for="cashMonth">Mes de pago</label><select id="cashMonth"></select></div>
+        <div class="field"><label for="cashAmount">Monto ($)</label><input type="number" id="cashAmount" min="1" step="0.01"></div>
       </div>
-      <div class="field"><label>Fecha de pago</label><input type="date" id="cashDate"></div>
-      <div class="field"><label>Notas (opcional)</label><input type="text" id="cashNotes" placeholder="Ej. Pago en efectivo recibido en oficina"></div>
+      <div class="field"><label for="cashDate">Fecha de pago</label><input type="date" id="cashDate"></div>
+      <div class="field"><label for="cashNotes">Notas (opcional)</label><input type="text" id="cashNotes" placeholder="Ej. Pago en efectivo recibido en oficina"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modalCashPayment')">Cancelar</button>
@@ -632,7 +632,7 @@
         </div>
         <input type="file" id="txFile" accept=".csv" style="display:none" onchange="document.getElementById('txFileLabel').textContent=this.files[0]?.name||'Seleccionar .csv'">
       </div>
-      <div class="field"><label>O pega desde Excel (Tab separado)</label>
+      <div class="field"><label for="txPaste">O pega desde Excel (Tab separado)</label>
         <textarea id="txPaste" placeholder="2026-06-01	egreso	Proveedor SA	Compra de material de limpieza	1500.00" style="height:100px;font-family:monospace;font-size:12px"></textarea>
       </div>
     </div>
@@ -658,18 +658,18 @@
   <div class="modal" style="max-width:420px">
     <div class="modal-head"><span class="modal-title">Agregar multa o adeudo</span><button class="modal-close" onclick="closeModal('modalAddFine')">✕</button></div>
     <div class="modal-body">
-      <div class="field"><label>Residente</label><select id="fineResidentId"></select></div>
-      <div class="field"><label>Tipo de cargo</label>
+      <div class="field"><label for="fineResidentId">Residente</label><select id="fineResidentId"></select></div>
+      <div class="field"><label for="fineType">Tipo de cargo</label>
         <select id="fineType">
           <option value="Multa">Multa</option>
           <option value="Adeudo">Adeudo</option>
         </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label>Monto ($)</label><input type="number" id="fineAmount" min="1" step="0.01"></div>
-        <div class="field"><label>Mes que aplica</label><select id="fineMonth"></select></div>
+        <div class="field"><label for="fineAmount">Monto ($)</label><input type="number" id="fineAmount" min="1" step="0.01"></div>
+        <div class="field"><label for="fineMonth">Mes que aplica</label><select id="fineMonth"></select></div>
       </div>
-      <div class="field"><label>Descripción</label><input type="text" id="fineDescription" placeholder="Ej. Ruidos nocturnos, cuota pendiente..."></div>
+      <div class="field"><label for="fineDescription">Descripción</label><input type="text" id="fineDescription" placeholder="Ej. Ruidos nocturnos, cuota pendiente..."></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modalAddFine')">Cancelar</button>

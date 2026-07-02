@@ -151,6 +151,7 @@ select:focus-visible, textarea:focus-visible, .nav-item:focus-visible,
   font-family: inherit;
 }
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
+.field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
 .field textarea { resize: vertical; min-height: 80px; }
 .field-hint { font-size: 11px; color: var(--mist); margin-top: 4px; }
 .pass-wrap { position: relative; }
