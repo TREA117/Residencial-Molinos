@@ -612,9 +612,15 @@
   <div class="modal">
     <div class="modal-head"><span class="modal-title">Importar ingresos y egresos</span><button class="modal-close" onclick="closeModal('modalImport')">✕</button></div>
     <div class="modal-body">
-      <div class="csv-section">
-        <div class="csv-title">Importar desde Excel/CSV</div>
-        <div class="csv-desc">Columnas: fecha, tipo (ingreso/egreso), proveedor, concepto, monto</div>
+      <div class="csv-section" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div>
+          <div class="csv-title">Importar desde Excel/CSV</div>
+          <div class="csv-desc">Columnas: fecha, tipo (ingreso/egreso), proveedor, concepto, monto</div>
+        </div>
+        <a href="plantilla-importar-ingresos-egresos.csv" download class="btn btn-sm" style="background:var(--gold-light);color:var(--navy);text-decoration:none;display:inline-flex;align-items:center;gap:6px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Descargar plantilla
+        </a>
       </div>
       <div class="field"><label>Archivo CSV</label>
         <div class="upload-zone" onclick="document.getElementById('txFile').click()">
