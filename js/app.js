@@ -436,9 +436,10 @@ function buildReceiptHTML(p) {
   const recNum       = p.receiptNum || p.receipt_num;
   const approvedDate = p.approvedDate || p.approved_date || new Date().toISOString().split('T')[0];
   const resName      = p.residentName || p.resident_name || '—';
-  const concept      = (p.category === 'Multa' || p.category === 'Adeudo')
+  const _esc         = typeof escH === 'function' ? escH : s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const concept      = _esc((p.category === 'Multa' || p.category === 'Adeudo')
     ? (p.description || p.category)
-    : 'Cuota de mantenimiento mensual';
+    : 'Cuota de mantenimiento mensual');
 
   return `
     <div class="receipt">
