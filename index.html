@@ -38,7 +38,7 @@
       <!-- LOGIN -->
       <div id="formLogin">
         <div class="field"><label>Correo electrónico</label><input type="email" id="loginEmail" placeholder="tu@correo.com"></div>
-        <div class="field"><label>Contraseña</label><input type="password" id="loginPass" placeholder="••••••••"></div>
+        <div class="field"><label>Contraseña</label><div class="pass-wrap"><input type="password" id="loginPass" placeholder="••••••••"><button type="button" class="pass-toggle" onclick="togglePassVis('loginPass',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
         <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar</button>
         <button class="btn btn-ghost btn-full" onclick="switchAuth('forgot')" style="margin-top:6px;font-size:13px">¿Olvidaste tu contraseña?</button>
       </div>
@@ -71,9 +71,8 @@
                  oninput="this.value=this.value.toUpperCase().replace(/\s+/g,'')">
           <div class="field-hint">⚠️ Escribe tu departamento en MAYÚSCULAS y SIN ESPACIOS. Ejemplo: 10H, 7E, 2B</div>
         </div>
-        <div class="field"><label>Contraseña</label><input type="password" id="regPass" placeholder="Mínimo 8 caracteres">
-          <div class="field-hint">Mínimo 8 caracteres, al menos un número y un carácter especial (ej. !, @, #, $)</div>
-        </div>
+        <div class="field"><label>Contraseña</label><div class="pass-wrap"><input type="password" id="regPass" placeholder="Mínimo 8 caracteres"><button type="button" class="pass-toggle" onclick="togglePassVis('regPass',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div><div class="field-hint">Mínimo 8 caracteres, al menos un número y un carácter especial (ej. !, @, #, $)</div></div>
+        <div class="field"><label>Confirmar contraseña</label><div class="pass-wrap"><input type="password" id="regPassConfirm" placeholder="Repite tu contraseña"><button type="button" class="pass-toggle" onclick="togglePassVis('regPassConfirm',this)" aria-label="Mostrar contraseña"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
         <button class="btn btn-primary btn-full" onclick="doRegister()">Solicitar acceso</button>
         <p style="font-size:11px;color:var(--mist);text-align:center;margin-top:10px">Al registrarte, administración recibirá una notificación para autorizar tu acceso.</p>
       </div>
@@ -691,7 +690,7 @@
 <script src="js/supabase.js?v=20260624"></script>
 <script src="js/db.js?v=20260701"></script>
 <script src="js/data.js?v=20260701"></script>
-<script src="js/auth.js?v=20260630"></script>
+<script src="js/auth.js?v=20260702"></script>
 <script src="js/app.js?v=20260701"></script>
 <script src="js/admin.js?v=20260702"></script>
 </body>

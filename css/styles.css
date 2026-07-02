@@ -153,6 +153,10 @@ select:focus-visible, textarea:focus-visible, .nav-item:focus-visible,
 .field input:focus, .field select:focus, .field textarea:focus { border-color: var(--gold); }
 .field textarea { resize: vertical; min-height: 80px; }
 .field-hint { font-size: 11px; color: var(--mist); margin-top: 4px; }
+.pass-wrap { position: relative; }
+.pass-wrap input { padding-right: 38px; width: 100%; box-sizing: border-box; }
+.pass-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 2px; color: var(--mist); line-height: 0; }
+.pass-toggle:hover { color: var(--slate); }
 
 /* ── BUTTONS ───────────────────────────────────────────────── */
 .btn {
