@@ -54,6 +54,7 @@ function populateMonthFilter(selectId, ledger, dateFn) {
 }
 
 function renderDashboard() {
+  checkAndApplyLateFees().catch(e => console.warn('late-fee check', e));
   const month = document.getElementById('dashMonth')?.value || '';
   const hasFilter = !!month;
 
@@ -1390,5 +1391,77 @@ async function deleteFine(id) {
     showToast('Cargo eliminado');
   } catch(e) {
     showToast('Error al eliminar: ' + (e?.message||e), 'error');
+  }
+}
+
+/* ── RECARGO AUTOMÁTICO POR PAGO TARDÍO ──────────────────────── */
+const MONTHS_ES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+let _lateFeeCheckDone = false;
+
+async function checkAndApplyLateFees() {
+  if (_lateFeeCheckDone) return;
+  _lateFeeCheckDone = true;
+
+  const today = new Date();
+  if (today.getDate() <= 10) return; // Solo aplica pasado el día 10
+
+  const currentMonthStr = MONTHS_ES[today.getMonth()] + ' ' + today.getFullYear();
+  const approvedResidents = DB.residents.filter(r => r.status === 'approved');
+  let applied = 0;
+
+  for (const resident of approvedResidents) {
+    const rid = resident.id;
+
+    // ¿Ya pagó el mantenimiento de este mes (aprobado o comprobante en revisión)?
+    const hasPaid = DB.payments.some(p =>
+      (p.resident_id === rid || p.residentId === rid) &&
+      p.month === currentMonthStr &&
+      (!p.category || p.category === 'Mantenimiento') &&
+      (p.status === 'approved' || p.status === 'pending')
+    );
+    if (hasPaid) continue;
+
+    // ¿Ya se le aplicó el recargo este mes?
+    const alreadyCharged = DB.payments.some(p =>
+      (p.resident_id === rid || p.residentId === rid) &&
+      p.month === currentMonthStr &&
+      p.category === 'Adeudo' &&
+      p.description === 'Recargo por pago tardío'
+    );
+    if (alreadyCharged) continue;
+
+    // Aplicar $50 de recargo
+    try {
+      const rows = await window.SUPABASE.insert('payments', {
+        resident_id:   rid,
+        resident_name: resident.name,
+        depto:         resident.depto,
+        month:         currentMonthStr,
+        amount:        50,
+        status:        'pending',
+        type:          'income',
+        description:   'Recargo por pago tardío',
+        category:      'Adeudo',
+        notes:         `Cargo automático por falta de pago antes del día 10 de ${currentMonthStr}`,
+      });
+      const row = Array.isArray(rows) ? rows[0] : rows;
+      if (row) {
+        DB.payments.push(typeof normalizePayment === 'function' ? normalizePayment(row) : row);
+        applied++;
+        window.SUPABASE.insert('notifications', {
+          user_id: rid,
+          message: `Se aplicó un recargo de $50 por pago tardío del mes de ${currentMonthStr}. Regulariza tu pago a la brevedad.`,
+          is_read: false,
+        }).catch(() => {});
+      }
+    } catch(e) {
+      console.error('Error al aplicar recargo a depto', resident.depto, e);
+    }
+  }
+
+  if (applied > 0) {
+    showToast(`Recargo de $50 aplicado a ${applied} departamento(s) sin pago`);
+    updatePendingCounts();
+    if (document.getElementById('tblFines')) renderFines();
   }
 }

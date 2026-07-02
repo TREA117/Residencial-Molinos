@@ -152,8 +152,9 @@ function renderMyPayments() {
   }
 
   const myPays = DB.payments.filter(p =>
-    p.residentId === currentUser.id || p.resident_id === currentUser.id ||
-    p.residentName === currentUser.name || p.resident_name === currentUser.name
+    (p.residentId === currentUser.id || p.resident_id === currentUser.id ||
+     p.residentName === currentUser.name || p.resident_name === currentUser.name) &&
+    p.category !== 'Multa' && p.category !== 'Adeudo'
   );
   const tbody = document.getElementById('tblMyPayments');
   if (tbody) {
