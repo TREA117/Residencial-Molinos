@@ -391,8 +391,12 @@ async function saveCashPayment() {
   const payDate    = document.getElementById('cashDate').value;
   const notes      = document.getElementById('cashNotes').value.trim();
   const category   = document.getElementById('cashType')?.value || 'Mantenimiento';
+  const linkedFineId = document.getElementById('cashLinkedFineId')?.value || '';
   if (!residentId || !month || !amount || !payDate) {
     showToast('Completa todos los campos requeridos', 'error'); return;
+  }
+  if ((category === 'Multa' || category === 'Adeudo') && !linkedFineId) {
+    showToast('Selecciona el cargo pendiente a saldar antes de registrar', 'error'); return;
   }
   const resident = DB.residents.find(r => r.id === residentId);
   if (!resident) { showToast('Residente no encontrado', 'error'); return; }
@@ -442,7 +446,6 @@ async function saveCashPayment() {
     } catch(ne) { console.warn('No se pudo crear la notificación', ne); }
 
     // Si hay un cargo (multa/adeudo) vinculado, descontar el pago
-    const linkedFineId = document.getElementById('cashLinkedFineId')?.value;
     if (linkedFineId) {
       await _applyPaymentToFine(linkedFineId, amount);
     }
@@ -687,9 +690,9 @@ function renderVouchers() {
   const area = document.getElementById('vouchersArea');
   if (!area) return;
 
-  // Group by depto (solo comprobantes ligados a un residente)
+  // Group by depto — excluye multas/adeudos sin recibo (aún pendientes de pago)
   const byDepto = {};
-  DB.payments.filter(p=>p.residentId||p.resident_id).forEach(p => {
+  DB.payments.filter(p => (p.residentId||p.resident_id) && !((p.category==='Multa'||p.category==='Adeudo') && !(p.receiptNum||p.receipt_num))).forEach(p => {
     const d = p.depto||'SIN-DEPTO';
     if (!byDepto[d]) byDepto[d] = [];
     byDepto[d].push(p);
@@ -710,7 +713,7 @@ function renderVouchers() {
 }
 
 function openDeptoFolder(depto) {
-  const pays = DB.payments.filter(p=>(p.residentId||p.resident_id)&&(p.depto||'SIN-DEPTO')===depto);
+  const pays = DB.payments.filter(p => (p.residentId||p.resident_id) && (p.depto||'SIN-DEPTO')===depto && !((p.category==='Multa'||p.category==='Adeudo') && !(p.receiptNum||p.receipt_num)));
   document.getElementById('folderTitle').textContent = 'Depto ' + depto;
   document.getElementById('folderBody').innerHTML = `
     <table style="width:100%">
