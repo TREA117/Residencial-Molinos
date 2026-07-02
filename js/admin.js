@@ -1328,7 +1328,7 @@ async function deleteReglamento() {
 /* ── MULTAS Y ADEUDOS (admin) ────────────────────────────────── */
 function renderFines() {
   const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const fines = DB.payments.filter(p => p.resident_id && (p.category === 'Multa' || p.category === 'Adeudo'))
+  const fines = DB.payments.filter(p => p.resident_id && (p.category === 'Multa' || p.category === 'Adeudo') && p.status === 'pending')
     .sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''));
   const tbody = document.getElementById('tblFines');
   if (!tbody) return;

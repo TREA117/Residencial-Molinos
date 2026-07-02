@@ -70,7 +70,7 @@ async function goTo(page) {
 
 function updatePendingCounts() {
   const pRes = DB.residents.filter(r => r.status === 'pending').length;
-  const pPay = DB.payments.filter(p => p.status === 'pending').length;
+  const pPay = DB.payments.filter(p => p.status === 'pending' && p.category !== 'Multa' && p.category !== 'Adeudo').length;
   ['pendingResCount','pendingResCount2'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = pRes; el.classList.toggle('hidden', pRes === 0); }
