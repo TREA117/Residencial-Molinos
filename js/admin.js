@@ -286,7 +286,9 @@ async function saveNewResident() {
 /* ── PAYMENTS / VOUCHERS (admin) ───────────────────────────── */
 function renderPayments() {
   const depto     = document.getElementById('filterPayDepto')?.value||'';
-  const residentPays = DB.payments.filter(p=>p.residentId||p.resident_id);
+  // Excluir multas/adeudos sin comprobante — esos los gestiona el admin en "Multas / Adeudos", no aquí
+  const isAdminCharge = p => (p.category === 'Multa' || p.category === 'Adeudo') && !p.voucher_url && !p.voucherUrl;
+  const residentPays = DB.payments.filter(p => (p.residentId||p.resident_id) && !isAdminCharge(p));
   const pending   = residentPays.filter(p=>p.status==='pending');
   const all       = residentPays.filter(p=>p.status!=='rejected').filter(p=>!depto||p.depto===depto);
   const ppb = document.getElementById('payPendingBadge');
