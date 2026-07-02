@@ -41,6 +41,13 @@ function normalizeNotification(n) {
   };
 }
 
+/* Cuenta de revisión de Google Play — es un residente real (para que el
+   revisor de la tienda pueda ver esa vista), pero no debe aparecer en las
+   listas/selects que usa el administrador. Se filtra solo ahí (ver
+   visibleResidents() en admin.js), nunca en DB.residents completo, porque
+   esta misma cuenta necesita encontrar su propio perfil al iniciar sesión. */
+const HIDDEN_REVIEW_EMAILS = ['residente.demo@molino.com'];
+
 /* Construye DB.residents como vista de DB.users (solo no-admin) */
 function syncResidentsFromUsers() {
   DB.residents = DB.users

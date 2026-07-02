@@ -6,6 +6,12 @@ function escH(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+/* DB.residents sin las cuentas de revisión de Google Play — usar esto (no
+   DB.residents directo) en toda tabla, select o conteo que vea el admin. */
+function visibleResidents() {
+  return DB.residents.filter(r => !HIDDEN_REVIEW_EMAILS.includes(String(r.email||'').toLowerCase()));
+}
+
 /* ── DASHBOARD ─────────────────────────────────────────────── */
 /* Filtro de fecha compartido por Dashboard e Ingresos/Egresos:
    from/to vacíos = sin límite en ese extremo. */
@@ -65,8 +71,8 @@ function renderDashboard() {
   const totalIncome    = approved.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalExpense   = approved.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
   const balance        = totalIncome - totalExpense;
-  const approvedRes    = DB.residents.filter(r=>r.status==='approved').length;
-  const pendingRes     = DB.residents.filter(r=>r.status==='pending').length;
+  const approvedRes    = visibleResidents().filter(r=>r.status==='approved').length;
+  const pendingRes     = visibleResidents().filter(r=>r.status==='pending').length;
 
   populateMonthFilter('dashMonth', approvedAll, p=>p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'');
 
@@ -138,8 +144,8 @@ function renderCharts() {
 /* ── RESIDENTS ─────────────────────────────────────────────── */
 function renderResidents() {
   const search  = (document.getElementById('searchResident')?.value||'').toLowerCase();
-  const pending = DB.residents.filter(r=>r.status==='pending');
-  const all     = DB.residents.filter(r=>(r.name||'').toLowerCase().includes(search)||String(r.depto||'').toLowerCase().includes(search));
+  const pending = visibleResidents().filter(r=>r.status==='pending');
+  const all     = visibleResidents().filter(r=>(r.name||'').toLowerCase().includes(search)||String(r.depto||'').toLowerCase().includes(search));
   const pb = document.getElementById('pendingBadge');
   if (pb) pb.textContent = pending.length;
 
@@ -330,7 +336,7 @@ function openCashPaymentModal() {
   const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   // Residentes autorizados ordenados por depto
   const sel = document.getElementById('cashResidentId');
-  sel.innerHTML = DB.residents
+  sel.innerHTML = visibleResidents()
     .filter(r => r.status === 'approved')
     .sort((a, b) => (a.depto||'').localeCompare(b.depto||''))
     .map(r => `<option value="${escH(r.id)}">${escH(r.depto)} — ${escH(r.name)}</option>`)
@@ -1139,7 +1145,7 @@ async function renderReports() {
       const totalsRow = Array.isArray(totalsRes.data) ? totalsRes.data[0] : totalsRes.data;
       ingresosMes = Number(totalsRow?.income) || 0;
       egresosMes  = Number(totalsRow?.expense) || 0;
-      rows = reportRes.data || [];
+      rows = (reportRes.data || []).filter(r => r.depto !== 'REV1'); // cuenta de revisión de Google Play
     } catch (e) {
       console.error('No se pudo cargar el reporte', e);
       showToast('Error al cargar el reporte: '+(e?.message||e), 'error');
@@ -1361,7 +1367,7 @@ function renderFines() {
 function openAddFineModal() {
   const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const sel = document.getElementById('fineResidentId');
-  sel.innerHTML = DB.residents
+  sel.innerHTML = visibleResidents()
     .filter(r => r.status === 'approved')
     .sort((a,b) => (a.depto||'').localeCompare(b.depto||''))
     .map(r => `<option value="${escH(r.id)}">${escH(r.depto)} — ${escH(r.name)}</option>`)
@@ -1540,7 +1546,7 @@ async function checkAndApplyLateFees() {
   if (today.getDate() <= 10) return; // Solo aplica pasado el día 10
 
   const currentMonthStr = MONTHS_ES[today.getMonth()] + ' ' + today.getFullYear();
-  const approvedResidents = DB.residents.filter(r => r.status === 'approved');
+  const approvedResidents = visibleResidents().filter(r => r.status === 'approved');
   let applied = 0;
 
   for (const resident of approvedResidents) {
