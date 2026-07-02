@@ -1453,11 +1453,15 @@ async function markFinePaid(id) {
   const client = window.SUPABASE?.client?.();
   if (!client) { showToast('Sin conexión', 'error'); return; }
   try {
-    const today = new Date().toISOString().split('T')[0];
-    // Eliminar el cargo original
+    const now = new Date();
+    const todayStr  = now.toISOString().split('T')[0];
+    const mm        = String(now.getMonth() + 1).padStart(2, '0');
+    const yyyy      = now.getFullYear();
+    const receiptNum = `${yyyy}-${mm}-${p.depto || 'XXX'}`;
+
     const { error: delErr } = await client.from('payments').delete().eq('id', id);
     if (delErr) throw delErr;
-    // Crear ingreso con los datos del cargo
+
     const incomeRows = await window.SUPABASE.insert('payments', {
       resident_id:   p.resident_id || p.residentId,
       resident_name: p.resident_name || p.residentName,
@@ -1468,17 +1472,39 @@ async function markFinePaid(id) {
       type:          'income',
       category:      p.category,
       description:   p.description || (p.category + ' ' + p.month),
-      payment_date:  today,
-      approved_date: today,
+      payment_date:  todayStr,
+      approved_date: todayStr,
+      receipt_num:   receiptNum,
       notes:         'Registrado como pagado desde Multas / Adeudos',
     });
+
     DB.payments = DB.payments.filter(x => String(x.id) !== String(id));
-    const row = Array.isArray(incomeRows) ? incomeRows[0] : incomeRows;
-    if (row) DB.payments.push(typeof normalizePayment === 'function' ? normalizePayment(row) : row);
+    const row  = Array.isArray(incomeRows) ? incomeRows[0] : incomeRows;
+    const newP = row ? (typeof normalizePayment === 'function' ? normalizePayment(row) : row) : null;
+    if (newP) {
+      newP.receiptNum = newP.receiptNum || newP.receipt_num || receiptNum;
+      DB.payments.push(newP);
+    }
+
     renderFines();
     if (typeof renderFinances === 'function') renderFinances();
     updatePendingCounts();
-    showToast('✓ Cargo pagado — ingreso registrado en Ingresos/Egresos');
+    showToast('✓ Cargo pagado — Recibo ' + receiptNum);
+
+    if (newP) {
+      showReceipt(newP.id);
+      try {
+        const blob = await generateReceiptImageBlob(newP);
+        const url  = await uploadReceiptImage(newP, blob);
+        if (url) {
+          await window.SUPABASE.update('payments', newP.id, { receipt_url: url });
+          newP.receiptUrl = url; newP.receipt_url = url;
+        }
+      } catch(ue) {
+        console.error('No se pudo subir el recibo a Storage', ue);
+        showToast('Pago registrado, pero no se pudo subir el recibo: ' + (ue?.message||ue), 'error');
+      }
+    }
   } catch(e) {
     showToast('Error: ' + (e?.message||e), 'error');
   }

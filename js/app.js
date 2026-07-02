@@ -436,6 +436,9 @@ function buildReceiptHTML(p) {
   const recNum       = p.receiptNum || p.receipt_num;
   const approvedDate = p.approvedDate || p.approved_date || new Date().toISOString().split('T')[0];
   const resName      = p.residentName || p.resident_name || '—';
+  const concept      = (p.category === 'Multa' || p.category === 'Adeudo')
+    ? (p.description || p.category)
+    : 'Cuota de mantenimiento mensual';
 
   return `
     <div class="receipt">
@@ -450,7 +453,7 @@ function buildReceiptHTML(p) {
         </div>
         <div class="receipt-row"><span class="key">Residente</span><span>${resName}</span></div>
         <div class="receipt-row"><span class="key">Departamento</span><span>${p.depto||'—'}</span></div>
-        <div class="receipt-row"><span class="key">Concepto</span><span>Cuota de mantenimiento mensual</span></div>
+        <div class="receipt-row"><span class="key">Concepto</span><span>${concept}</span></div>
         <div class="receipt-row"><span class="key">Período</span><span>${p.month||'—'}</span></div>
         <div class="receipt-row"><span class="key">Fecha de pago</span><span>${p.paymentDate||p.payment_date ? fmtDate(p.paymentDate||p.payment_date) : fmtDate(approvedDate)}</span></div>
         <div class="receipt-row"><span class="key">Fecha aprobación</span><span>${fmtDate(approvedDate)}</span></div>
