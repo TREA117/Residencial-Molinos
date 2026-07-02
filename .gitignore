@@ -1,6 +1,10 @@
 # Claude Code local settings (específico de esta máquina, no compartir)
 .claude/
 
+# Skills instaladas vía `npx skills add` (específico de esta máquina)
+.agents/
+skills-lock.json
+
 # Snapshots de Playwright MCP — pueden capturar valores de campos de formulario incluyendo contraseñas
 .playwright-mcp/
 
