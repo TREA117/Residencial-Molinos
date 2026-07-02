@@ -1,6 +1,9 @@
 # Claude Code local settings (específico de esta máquina, no compartir)
 .claude/
 
+# Snapshots de Playwright MCP — pueden capturar valores de campos de formulario incluyendo contraseñas
+.playwright-mcp/
+
 # Proyecto mobile vive en su propio repo (mobile/.git)
 mobile/
 
