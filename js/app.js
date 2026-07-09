@@ -82,19 +82,38 @@ function updatePendingCounts() {
 }
 
 /* ── PAYMENT DAY BANNER (days 1-10 of month) ──────────────── */
+const _MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+
 function checkPaymentBanner() {
   const today = new Date();
   const day   = today.getDate();
   const banner = document.getElementById('paymentDayBanner');
   if (!banner || !currentUser || currentUser.role === 'admin') return;
   if (day >= 1 && day <= 10) {
-    const res = DB.residents.find(r =>
-      r.userId === currentUser.id || r.user_id === currentUser.id || r.email === currentUser.email
-    );
     const fee = currentUser.fee || DB.settings?.defaultFee || 400;
-    const monthName = today.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+    const monthLabel = `${_MONTH_NAMES[today.getMonth()]} ${today.getFullYear()}`;
+    const monthName  = today.toLocaleDateString('es-MX', { month: 'long', year: 'numeric' });
+
+    // No mostrar "Pagar ahora" si ya hay un pago de mantenimiento aprobado
+    // este mes (p.ej. registrado en efectivo por administración) — antes el
+    // banner solo miraba el rango de fechas y el adeudo nunca se "quitaba".
+    const alreadyPaid = DB.payments.some(p =>
+      (p.residentId === currentUser.id || p.resident_id === currentUser.id ||
+       p.residentName === currentUser.name || p.resident_name === currentUser.name) &&
+      (p.category === 'Mantenimiento' || !p.category) &&
+      p.status === 'approved' &&
+      p.month === monthLabel
+    );
+
     banner.classList.remove('hidden');
-    banner.innerHTML = `
+    banner.innerHTML = alreadyPaid ? `
+      <div class="payment-alert-banner">
+        <div class="payment-alert-icon">✅</div>
+        <div class="payment-alert-text">
+          <div class="payment-alert-title">Ya pagaste tu mantenimiento de ${monthName}</div>
+          <div class="payment-alert-sub">Gracias por tu pago — puedes ver tu recibo en "Mis pagos".</div>
+        </div>
+      </div>` : `
       <div class="payment-alert-banner">
         <div class="payment-alert-icon">🗓️</div>
         <div class="payment-alert-text">
@@ -251,7 +270,15 @@ function renderMyAccount() {
   const isFineCharge = p => (p.category === 'Multa' || p.category === 'Adeudo') && !p.voucher_url && !p.voucherUrl;
   const pendingFines = myPays.filter(p => p.status === 'pending' && isFineCharge(p));
   const pendingFinesTotal = pendingFines.reduce((s,p) => s + Number(p.amount||0), 0);
-  const totalOwed = fee + pendingFinesTotal;
+
+  // No sumar la cuota mensual si ya hay un pago de Mantenimiento aprobado
+  // este mes — si no, "Total adeudado" seguía contando los $400 del mes ya
+  // pagado además de las multas/adeudos pendientes.
+  const currentMonthLabel = `${_MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()}`;
+  const feeAlreadyPaidThisMonth = approved.some(p =>
+    (p.category === 'Mantenimiento' || !p.category) && p.month === currentMonthLabel
+  );
+  const totalOwed = (feeAlreadyPaidThisMonth ? 0 : fee) + pendingFinesTotal;
 
   function statusLabel(p) {
     if (p.status === 'approved') return ['badge-approved', 'Pagado'];
@@ -265,7 +292,7 @@ function renderMyAccount() {
       <div class="metric"><div class="metric-label">Total pagado</div><div class="metric-value" style="color:var(--navy)">${fmt(totalPaid)}</div><div class="metric-change up">${approved.length} pagos aprobados</div></div>
       <div class="metric"><div class="metric-label">En revisión</div><div class="metric-value" style="color:var(--c-amber)">${pending.length}</div><div class="metric-change">comprobantes pendientes</div></div>
       <div class="metric"><div class="metric-label">Cuota mensual</div><div class="metric-value">${fmt(fee)}</div><div class="metric-change">mantenimiento</div></div>
-      ${pendingFinesTotal > 0 ? `<div class="metric" style="border-left:3px solid #dc2626"><div class="metric-label" style="color:#dc2626">Total adeudado este mes</div><div class="metric-value" style="color:#dc2626">${fmt(totalOwed)}</div><div class="metric-change">cuota + ${pendingFines.length} cargo(s) pendiente(s)</div></div>` : ''}
+      ${pendingFinesTotal > 0 ? `<div class="metric" style="border-left:3px solid #dc2626"><div class="metric-label" style="color:#dc2626">Total adeudado este mes</div><div class="metric-value" style="color:#dc2626">${fmt(totalOwed)}</div><div class="metric-change">${feeAlreadyPaidThisMonth ? '' : 'cuota + '}${pendingFines.length} cargo(s) pendiente(s)</div></div>` : ''}
     </div>
     <div class="card">
       <div class="card-head"><span class="card-title">Estado de cuenta</span></div>

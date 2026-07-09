@@ -356,17 +356,40 @@ function openCashPaymentModal() {
   document.getElementById('cashNotes').value  = '';
   document.getElementById('cashType').value   = 'Mantenimiento';
   document.getElementById('cashFineSection')?.classList.add('hidden');
+  document.getElementById('cashFullYear').checked = false;
+  document.getElementById('cashFullYearField')?.classList.remove('hidden');
+  onCashFullYearChange();
   openModal('modalCashPayment');
 }
 
 function onCashTypeChange() {
   const type = document.getElementById('cashType').value;
   const section = document.getElementById('cashFineSection');
+  const fullYearField = document.getElementById('cashFullYearField');
   if (type === 'Multa' || type === 'Adeudo') {
     section?.classList.remove('hidden');
     _populateCashFineSelect();
+    // El registro de año completo solo aplica a mantenimiento mensual.
+    fullYearField?.classList.add('hidden');
+    document.getElementById('cashFullYear').checked = false;
+    onCashFullYearChange();
   } else {
     section?.classList.add('hidden');
+    fullYearField?.classList.remove('hidden');
+  }
+}
+
+function onCashFullYearChange() {
+  const fullYear = document.getElementById('cashFullYear').checked;
+  document.getElementById('cashMonthLabel').textContent = fullYear ? 'Año (elige cualquier mes de ese año)' : 'Mes de pago';
+  document.getElementById('cashAmountLabel').textContent = fullYear ? 'Monto mensual ($)' : 'Monto ($)';
+}
+
+function submitCashPayment() {
+  if (document.getElementById('cashFullYear')?.checked) {
+    saveCashPaymentFullYear();
+  } else {
+    saveCashPayment();
   }
 }
 
@@ -483,6 +506,106 @@ async function saveCashPayment() {
   }
 }
 
+/* Registra los 12 meses de mantenimiento de un año de una sola vez (p.ej.
+   residentes que pagan el año completo por adelantado) — mismo flujo que
+   saveCashPayment() pero en lote, saltando los meses que ya estén pagados
+   para no duplicarlos. */
+async function saveCashPaymentFullYear() {
+  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const residentId = document.getElementById('cashResidentId').value;
+  const monthSel   = document.getElementById('cashMonth').value;
+  const amount     = parseFloat(document.getElementById('cashAmount').value);
+  const payDate    = document.getElementById('cashDate').value;
+  const notes      = document.getElementById('cashNotes').value.trim();
+  if (!residentId || !monthSel || !amount || !payDate) {
+    showToast('Completa todos los campos requeridos', 'error'); return;
+  }
+  const resident = DB.residents.find(r => r.id === residentId);
+  if (!resident) { showToast('Residente no encontrado', 'error'); return; }
+
+  const year = monthSel.split(' ').pop();
+  const today = new Date().toISOString().split('T')[0];
+
+  const alreadyPaidMonths = new Set(
+    DB.payments.filter(p =>
+      (p.resident_id === residentId || p.residentId === residentId) &&
+      (p.category === 'Mantenimiento' || !p.category) &&
+      p.status === 'approved'
+    ).map(p => p.month)
+  );
+  const monthsToInsert = MONTHS.filter(m => !alreadyPaidMonths.has(`${m} ${year}`));
+  if (!monthsToInsert.length) {
+    showToast(`Ese residente ya tiene los 12 meses de ${year} pagados`, 'error'); return;
+  }
+
+  const btn = document.querySelector('#modalCashPayment .btn-gold');
+  if (btn) { btn.disabled = true; btn.textContent = `Registrando ${monthsToInsert.length} meses...`; }
+
+  try {
+    const newRows = monthsToInsert.map((monthName, idx) => {
+      const mm = String(MONTHS.indexOf(monthName) + 1).padStart(2, '0');
+      return {
+        resident_id: residentId, resident_name: resident.name,
+        depto: resident.depto, month: `${monthName} ${year}`, amount,
+        status: 'approved', type: 'income',
+        description: `Cuota mantenimiento ${monthName} ${year} — Depto ${resident.depto}`,
+        category: 'Mantenimiento',
+        payment_date: payDate, approved_date: today,
+        receipt_num: `${year}-${mm}-${resident.depto}`,
+        notes: notes || `Pago en efectivo (año completo ${year}) registrado por administración`,
+      };
+    });
+
+    const rows = await window.SUPABASE.insert('payments', newRows);
+    const insertedRows = Array.isArray(rows) ? rows : [rows];
+    if (!insertedRows.length) throw new Error('Sin respuesta del servidor');
+
+    const insertedPayments = insertedRows.map(row => ({
+      ...row,
+      residentId: row.resident_id, residentName: row.resident_name,
+      receiptNum: row.receipt_num, receiptUrl: null,
+      paymentDate: row.payment_date, approvedDate: row.approved_date,
+      hasVoucher: false,
+    }));
+    DB.payments.push(...insertedPayments);
+
+    try {
+      const notifRows = await window.SUPABASE.insert('notifications', {
+        user_id: residentId,
+        message: `Se registraron ${insertedPayments.length} pagos de mantenimiento del año ${year} por administración. Ya puedes ver tus recibos.`,
+        is_read: false,
+      });
+      const notifRow = Array.isArray(notifRows) ? notifRows[0] : notifRows;
+      if (notifRow && typeof normalizeNotification === 'function') DB.notifications.push(normalizeNotification(notifRow));
+    } catch(ne) { console.warn('No se pudo crear la notificación', ne); }
+
+    closeModal('modalCashPayment');
+    renderPayments();
+    showToast(`✓ ${insertedPayments.length} meses de ${year} registrados — generando recibos...`);
+
+    // Generar y subir los recibos en secuencia (uno por mes)
+    for (const p of insertedPayments) {
+      try {
+        const blob = await generateReceiptImageBlob(p);
+        const url  = await uploadReceiptImage(p, blob);
+        if (!url) throw new Error('uploadReceiptImage no devolvió URL');
+        await window.SUPABASE.update('payments', p.id, { receipt_url: url });
+        p.receiptUrl = url; p.receipt_url = url;
+      } catch(ue) {
+        console.error('No se pudo subir el recibo de', p.month, ue);
+      }
+    }
+    if (typeof renderMyPayments === 'function') renderMyPayments();
+    if (typeof renderVouchers === 'function') renderVouchers();
+    showToast(`✓ Recibos del año ${year} generados`);
+  } catch(e) {
+    console.error('Error al registrar el año completo', e);
+    showToast('Error: ' + (e?.message||e), 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Registrar y generar recibo'; }
+  }
+}
+
 async function approvePayment(id) {
   const p = DB.payments.find(p=>p.id===id);
   if (!p) return;
@@ -491,17 +614,23 @@ async function approvePayment(id) {
   const yyyy  = today.getFullYear();
   const approvedDate = today.toISOString().split('T')[0];
   const receiptNum   = `${yyyy}-${mm}-${p.depto||'XXX'}`;
-  const desc = 'Cuota mantenimiento '+p.month+' — Depto '+p.depto;
+  // Preservar la categoría original (Mantenimiento/Multa/Adeudo): antes se
+  // forzaba a 'Mantenimiento' aquí mismo, lo que hacía que el chequeo de
+  // abajo (multa/adeudo) nunca se cumpliera y el cargo vinculado jamás se
+  // descontara.
+  const category = p.category || 'Mantenimiento';
+  const descMap = { Mantenimiento: 'Cuota mantenimiento', Multa: 'Multa', Adeudo: 'Adeudo' };
+  const desc = `${descMap[category]||category} ${p.month} — Depto ${p.depto}`;
 
   try {
     await window.SUPABASE.update('payments', id, {
       status:'approved', approved_date:approvedDate, receipt_num:receiptNum,
-      type:'income', description:desc, category:'Mantenimiento'
+      type:'income', description:desc, category
     });
     p.status = 'approved';
     p.approvedDate = approvedDate; p.approved_date = approvedDate;
     p.receiptNum = receiptNum; p.receipt_num = receiptNum;
-    p.type = 'income'; p.description = desc; p.category = 'Mantenimiento';
+    p.type = 'income'; p.description = desc; p.category = category;
   } catch(e) {
     console.error('Supabase approve payment failed', e);
     showToast('Error al aprobar el pago: '+(e?.message||e), 'error');
@@ -512,12 +641,12 @@ async function approvePayment(id) {
   updatePendingCounts();
 
   // Si el comprobante aprobado corresponde a una multa/adeudo, descontar del cargo pendiente
-  if (p.category === 'Multa' || p.category === 'Adeudo') {
+  if (category === 'Multa' || category === 'Adeudo') {
     const rid = p.resident_id || p.residentId;
     const linkedFine = DB.payments.find(f =>
       String(f.id) !== String(id) &&
       (f.resident_id === rid || f.residentId === rid) &&
-      f.category === p.category &&
+      f.category === category &&
       f.status === 'pending' &&
       !f.voucher_url && !f.voucherUrl
     );

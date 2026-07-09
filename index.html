@@ -595,16 +595,22 @@
       <div id="cashFineSection" class="hidden">
         <div class="field"><label for="cashLinkedFineId">Cargo pendiente a saldar</label><select id="cashLinkedFineId"><option value="">— Pago independiente —</option></select><div class="field-hint">Selecciona el cargo al que aplica este pago (opcional)</div></div>
       </div>
+      <div class="field" id="cashFullYearField">
+        <label style="display:flex;align-items:center;gap:8px;font-weight:400;cursor:pointer">
+          <input type="checkbox" id="cashFullYear" onchange="onCashFullYearChange()" style="width:auto">
+          Registrar el año completo (12 meses) en vez de solo un mes
+        </label>
+      </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label for="cashMonth">Mes de pago</label><select id="cashMonth"></select></div>
-        <div class="field"><label for="cashAmount">Monto ($)</label><input type="number" id="cashAmount" min="1" step="0.01"></div>
+        <div class="field"><label for="cashMonth" id="cashMonthLabel">Mes de pago</label><select id="cashMonth"></select></div>
+        <div class="field"><label for="cashAmount" id="cashAmountLabel">Monto ($)</label><input type="number" id="cashAmount" min="1" step="0.01"></div>
       </div>
       <div class="field"><label for="cashDate">Fecha de pago</label><input type="date" id="cashDate"></div>
       <div class="field"><label for="cashNotes">Notas (opcional)</label><input type="text" id="cashNotes" placeholder="Ej. Pago en efectivo recibido en oficina"></div>
     </div>
     <div class="modal-foot">
       <button class="btn btn-secondary" onclick="closeModal('modalCashPayment')">Cancelar</button>
-      <button class="btn btn-gold" onclick="saveCashPayment()">Registrar y generar recibo</button>
+      <button class="btn btn-gold" onclick="submitCashPayment()">Registrar y generar recibo</button>
     </div>
   </div>
 </div>
@@ -694,7 +700,7 @@
 <script src="js/db.js?v=20260701"></script>
 <script src="js/data.js?v=20260702"></script>
 <script src="js/auth.js?v=20260702"></script>
-<script src="js/app.js?v=20260703"></script>
-<script src="js/admin.js?v=20260702"></script>
+<script src="js/app.js?v=20260709"></script>
+<script src="js/admin.js?v=20260708b"></script>
 </body>
 </html>
