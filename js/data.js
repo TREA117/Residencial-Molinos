@@ -68,7 +68,7 @@ async function loadDB() {
   }
   try {
     const [users, payments, notifications, settingsRows] = await Promise.all([
-      sb.listColumns('users', 'id,name,email,role,phone,depto,depto_status,fee,created_at'),
+      sb.listColumns('users', 'id,name,email,role,phone,depto,depto_status,fee,exento_mantenimiento,created_at'),
       sb.listColumns('payments', 'id,resident_id,resident_name,depto,month,amount,status,sent_date,approved_date,receipt_num,voucher_url,payment_date,receipt_url,type,description,category,reference,notes,provider'),
       sb.listColumns('notifications', 'id,user_id,message,is_read,created_at').catch(e => { console.warn('Tabla notifications no disponible', e); return []; }),
       sb.list('settings').catch(e => { console.warn('Tabla settings no disponible (corre la migración SQL)', e); return []; }),

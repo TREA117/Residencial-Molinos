@@ -236,6 +236,7 @@ function editResidentModal(id) {
   document.getElementById('editResPhone').value = r.phone ||'';
   document.getElementById('editResDepto').value = r.depto ||'';
   document.getElementById('editResStatus').value= r.status||'pending';
+  document.getElementById('editResExento').checked = !!r.exento_mantenimiento;
   openModal('modalEditResident');
 }
 
@@ -248,11 +249,12 @@ async function saveEditResident() {
   const phone  = document.getElementById('editResPhone').value.trim();
   const depto  = document.getElementById('editResDepto').value.trim().toUpperCase().replace(/\s+/g,'');
   const status = document.getElementById('editResStatus').value;
+  const exento = document.getElementById('editResExento').checked;
   try {
-    await window.SUPABASE.update('users', id, { name, email, phone, depto, depto_status: status });
-    r.name=name; r.email=email; r.phone=phone; r.depto=depto; r.status=status;
+    await window.SUPABASE.update('users', id, { name, email, phone, depto, depto_status: status, exento_mantenimiento: exento });
+    r.name=name; r.email=email; r.phone=phone; r.depto=depto; r.status=status; r.exento_mantenimiento=exento;
     const u = DB.users.find(u=>u.id===id);
-    if (u) { u.name=name; u.email=email; u.phone=phone; u.depto=depto; u.depto_status=status; u.deptoStatus=status; }
+    if (u) { u.name=name; u.email=email; u.phone=phone; u.depto=depto; u.depto_status=status; u.deptoStatus=status; u.exento_mantenimiento=exento; }
     closeModal('modalEditResident'); renderResidents(); showToast('Residente actualizado ✓');
   } catch(e) {
     console.error('Supabase update user failed', e);

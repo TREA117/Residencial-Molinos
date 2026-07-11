@@ -36,7 +36,7 @@ async function goTo(page) {
     const sb = window.SUPABASE;
     if (sb && sb.config && sb.config().hasKey) {
       try {
-        const users = await sb.listColumns('users', 'id,name,email,role,phone,depto,depto_status,fee,created_at');
+        const users = await sb.listColumns('users', 'id,name,email,role,phone,depto,depto_status,fee,exento_mantenimiento,created_at');
         if (users) {
           DB.users = users.map(u => ({
             ...u,
