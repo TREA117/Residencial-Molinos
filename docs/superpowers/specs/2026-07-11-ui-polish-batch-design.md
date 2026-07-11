@@ -28,6 +28,12 @@ decisiones se confirmaron con el usuario durante brainstorming:
   tanto al Dashboard de admin (reemplazando "Residentes activos") como al tab "Finanzas" de
   residentes (como tarjeta nueva) — en ambos casos es del mes calendario en curso, sin importar qué
   semestre esté seleccionado en la gráfica de flujo.
+- El selector de "año a pagar" del pago de año completo muestra exactamente 2 opciones: el año en
+  curso y el siguiente (para prepagar por adelantado) — no un rango de 3 años ni los 12 meses.
+- La limpieza de archivos (días 10-15) **no** se vuelve un borrado automático silencioso: en vez de
+  eso, a partir del día 16 se bloquea al admin de usar el resto del panel (no puede cambiar de
+  pantalla) hasta que complete "Descargar y limpiar" él mismo — así el respaldo (ZIP descargado a su
+  equipo) y el borrado siempre suceden con una persona presente, nunca sin supervisión.
 
 ## Alcance
 
@@ -58,12 +64,33 @@ decisiones se confirmaron con el usuario durante brainstorming:
    "MANTENIMIENTOS PAGADOS" con valor "X/Y" (residentes con mantenimiento aprobado este mes /
    residentes aprobados totales). Se agrega la misma tarjeta "Mantenimientos pagados" al tab
    Finanzas de residentes (no reemplaza nada ahí, se suma a Balance/Ingresos/Egresos).
-9. **Build + submit**: al terminar, correr `eas build` + `eas submit` (Android production →
-   internal track; iOS production → TestFlight) para que los cambios de mobile lleguen a las
-   pruebas internas — a diferencia de la última ronda, esta sí puede ir por actualización OTA
-   (`eas update`) si no se agregan dependencias nativas nuevas (ninguno de estos cambios las
-   requiere), evitando el ciclo completo de build nativo. Se confirmará con el usuario cuál usar en
-   el plan de implementación.
+9. **Pago de año completo — cobertura mes a mes ya correcta (verificación, sin código)**: se
+   confirmó por lectura de código que `saveCashPaymentFullYear()` (web y mobile) inserta 12 filas
+   individuales de `Mantenimiento`, una por mes, cada una con `status:'approved'` y el mismo formato
+   de `month` (`"NombreMes Año"`) que usan `checkAndApplyLateFees()` y los checks de
+   "Cuota mensual"/"Total adeudado" (`feeAlreadyPaidThisMonth`, `alreadyPaid`, etc.). Por diseño,
+   esto ya hace que: (a) el recargo por atraso nunca se aplique a un mes ya cubierto por un pago de
+   año completo, y (b) "Cuota mensual"/"Total adeudado" se oculten mes a mes durante todo el año
+   pagado, y vuelvan a aparecer el año siguiente si no se registra un nuevo pago anual — sin
+   necesidad de ningún flag o lógica especial de "año completo". Se agrega como paso de
+   verificación/testing, no como cambio de código.
+10. **Bug: "Multas / Adeudos" no refresca al eliminar** (solo web — mobile no tiene este bug, ver
+    Diseño): `deleteFine()` compara `p.id !== id` sin normalizar tipos; `id` llega como string desde
+    el botón y `p.id` es numérico en `DB.payments`, así que la comparación estricta nunca es igual y
+    la fila nunca se quita del arreglo local — solo desaparece al recargar la página (cuando
+    `loadDB()` vuelve a traer todo de Supabase, donde sí está borrado). Fix de una línea.
+11. **Archivos — ventana de días 10-15 + bloqueo forzoso**: el botón "Descargar y limpiar" pasa a
+    estar deshabilitado fuera de los días 10-15 del mes. A partir del día 16, si todavía quedan
+    comprobantes/recibos sin archivar de ese ciclo, se bloquea la navegación del admin a cualquier
+    otra pantalla (con un aviso fijo) hasta que complete "Descargar y limpiar" — mismo patrón de
+    "correr en el próximo login de un admin" que ya usa `checkAndApplyLateFees`, sin necesidad de
+    cron real en el servidor. Solo web (mobile no tiene esta función, ver Diseño).
+12. **Build + submit**: al terminar, correr `eas build` + `eas submit` (Android production →
+    internal track; iOS production → TestFlight) para que los cambios de mobile lleguen a las
+    pruebas internas — a diferencia de la última ronda, esta sí puede ir por actualización OTA
+    (`eas update`) si no se agregan dependencias nativas nuevas (ninguno de estos cambios las
+    requiere), evitando el ciclo completo de build nativo. Se confirmará con el usuario cuál usar en
+    el plan de implementación.
 
 **Explícitamente fuera de alcance:**
 - No se corrige el bug de "Total adeudado" no apareciendo cuando solo la cuota (sin multas) está
@@ -71,14 +98,20 @@ decisiones se confirmaron con el usuario durante brainstorming:
 - No se cambia el ícono/texto "🗑" del botón eliminar en Multas (mobile) — solo se iguala su tamaño
   al botón "Pagado".
 - No se toca la lógica de `checkAndApplyLateFees` ni la exención de mantenimiento (ya implementadas).
+- No se construye un cron real en el servidor (Supabase pg_cron/Edge Function) para la limpieza de
+  archivos — se usa el mismo patrón "corre cuando un admin abre la app" ya establecido en este
+  proyecto, decisión explícita del usuario.
+- No se agrega funcionalidad de Archivos/limpieza a mobile — hoy es de solo lectura ahí y este lote
+  no cambia eso, solo ajusta el flujo web.
 
 ## Diseño
 
 ### 1. Registrar año completo — selector de años, no meses
 
 **Web** (`js/admin.js`, `index.html:606-639`): en `onCashFullYearChange()`, cuando `fullYear` es
-`true`, reconstruir `#cashMonth` con opciones de año (ej. currentYear-1, currentYear, currentYear+1)
-en vez de dejar las opciones "Mes Año" ya pobladas por `openCashPaymentModal()`; cuando se
+`true`, reconstruir `#cashMonth` con exactamente 2 opciones de año (currentYear, currentYear+1 — año
+en curso y el siguiente, para prepagar por adelantado) en vez de dejar las opciones "Mes Año" ya
+pobladas por `openCashPaymentModal()`; cuando se
 desmarca, restaurar las opciones de mes originales (re-llamar la función que las puebla). Label
 pasa de `'Año (elige cualquier mes de ese año)'` a `'Año'`. `saveCashPaymentFullYear()` ya hace
 `monthSel.split(' ').pop()` para extraer el año de un string "Mes Año" — como ahora `cashMonth.value`
@@ -87,9 +120,9 @@ será directamente el año (ej. "2026"), simplificar esa línea a usar `monthSel
 dejar solo "Registrar el año completo".
 
 **Mobile** (`comprobantes.jsx`): mismo patrón — el `ListPicker` de mes (línea 392) debe recibir un
-`options` distinto cuando `fullYear` es `true` (lista de años en vez de `monthOptions`), y el
-`value`/`onChange` deben manejar un año en vez de un string "Mes Año". Label baja a `'Año'`. Texto
-del checkbox (línea ~389) baja a "Registrar el año completo".
+`options` distinto cuando `fullYear` es `true` (2 opciones de año — actual y siguiente — en vez de
+`monthOptions`), y el `value`/`onChange` deben manejar un año en vez de un string "Mes Año". Label
+baja a `'Año'`. Texto del checkbox (línea ~389) baja a "Registrar el año completo".
 
 ### 2. Gráfica "Flujo mensual" — filtro de semestres
 
@@ -200,6 +233,53 @@ solo más columnas en el `RETURNS TABLE`).
 una 4ª `MetricCard` "Mantenimientos pagados" leyendo las 2 columnas nuevas de la RPC (mismo patrón
 que `total_income`/`total_expense`, tomando `rows[0]`).
 
+### 9. Pago de año completo — verificación de cobertura mes a mes
+
+Sin cambios de código. `saveCashPaymentFullYear()` (web `js/admin.js:515-609`, mobile
+`mobile/src/services/admin.js:219-268`) inserta una fila por mes con `status:'approved'`,
+`category:'Mantenimiento'`, `month: "${monthName} ${year}"` — el mismo formato exacto que usa
+`checkAndApplyLateFees()` (`currentMonthStr = MONTHS_ES[today.getMonth()] + ' ' + today.getFullYear()`)
+y los checks de `feeAlreadyPaidThisMonth`/`alreadyPaid` en `renderMyAccount`/`checkPaymentBanner`/
+`renderMyPayments` (web) y sus equivalentes en `account.jsx`/`index.jsx` (mobile). Verificado que
+los 3 arreglos de nombres de mes (`MONTHS` en `saveCashPaymentFullYear` web, `CASH_MONTHS` en la
+versión mobile, `MONTHS_ES` en el cron de recargos) son textualmente idénticos — sin diferencias de
+acentos/mayúsculas que pudieran romper el `===`. Solo se agrega como paso de Testing.
+
+### 10. Fix: `deleteFine()` no refresca la tabla
+
+**Web** (`js/admin.js:1653-1666`), línea exacta a cambiar:
+```js
+    DB.payments = DB.payments.filter(p => p.id !== id);
+```
+por:
+```js
+    DB.payments = DB.payments.filter(p => String(p.id) !== String(id));
+```
+(mismo patrón de coerción explícita que ya usa `markFinePaid()` en el mismo archivo,
+`String(x.id) !== String(id)`). Sin cambios adicionales — `renderFines()` ya se llama después.
+Mobile no tiene este bug: su `MultasScreen` recarga la lista completa desde Supabase
+(`fetchFines`/`load()`) tras cada acción en vez de mantener un filtro local en memoria.
+
+### 11. Archivos — ventana de días 10-15 y bloqueo forzoso
+
+**Botón deshabilitado fuera de la ventana** (`index.html:271-278`, `js/admin.js`): agregar
+`disabled` (y estilo atenuado) al botón "Descargar y limpiar" cuando
+`today.getDate() < 10 || today.getDate() > 15`, calculado al renderizar `#pageVouchers`
+(`renderVouchers()`).
+
+**Bloqueo forzoso a partir del día 16**: agregar un chequeo (mismo patrón que
+`checkAndApplyLateFees`/`_lateFeeCheckDone` — corre una vez por sesión de admin, disparado desde
+`goTo()` o el render del Dashboard) que, si `today.getDate() > 15` **y** existe al menos un pago
+`status==='approved'` con `receipt_url`/`voucher_url` no nulos (señal de que aún no se ha archivado
+este ciclo), fuerza la navegación a `#pageVouchers` y bloquea el resto de `.nav-item` (deshabilitar
+sus `onclick` o interceptar `goTo()` para redirigir de vuelta a `vouchers` mientras la condición siga
+activa) hasta que `downloadAndCleanup()` complete exitosamente — el cual, al limpiar
+`receipt_url`/`voucher_url` de todos los pagos aprobados, hace que la condición dejar de cumplirse y
+libera la navegación normal. Mostrar un aviso fijo explicando por qué está bloqueado
+("Antes de continuar, descarga y limpia los archivos del período — hoy es día {N}, la ventana para
+hacerlo (10-15) ya pasó."). Solo web — `mobile/src/app/(admin)/archivos.jsx` es de solo lectura, sin
+botón de descarga/limpieza que gatear.
+
 ## Testing
 
 - Validación de sintaxis (`node --check` en web) y `npx expo export --platform ios|android` en
@@ -211,3 +291,11 @@ que `total_income`/`total_expense`, tomando `rows[0]`).
 - Antes del build/submit final: confirmar con el usuario si procede como actualización OTA
   (`eas update`) o build nativo completo, y a qué canal/rama de EAS Update apunta el perfil de
   producción actual (revisar `eas.json`/`app.json` por `runtimeVersion`/canales configurados).
+- Para el punto 9: registrar un pago de año completo de prueba y confirmar en Supabase que las 12
+  filas quedan con `month` en el formato correcto, luego confirmar manualmente (o por SQL) que
+  `checkAndApplyLateFees` las detecta como pagadas para el mes en curso.
+- Para el punto 10: eliminar un cargo en Multas/Adeudos y confirmar que desaparece de la tabla sin
+  necesidad de recargar la página.
+- Para el punto 11: probar manualmente cambiando la fecha del sistema (o simulando `today.getDate()`
+  en consola) a un día 16+ con pagos aprobados que tengan `receipt_url`/`voucher_url` no nulos, y
+  confirmar que el admin queda atrapado en Archivos hasta completar la limpieza.
