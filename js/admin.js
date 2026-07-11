@@ -1681,6 +1681,7 @@ async function checkAndApplyLateFees() {
   let applied = 0;
 
   for (const resident of approvedResidents) {
+    if (resident.exento_mantenimiento) continue;
     const rid = resident.id;
 
     // ¿Ya pagó el mantenimiento de este mes (aprobado o comprobante en revisión)?
