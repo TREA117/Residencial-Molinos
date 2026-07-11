@@ -89,6 +89,7 @@ function checkPaymentBanner() {
   const day   = today.getDate();
   const banner = document.getElementById('paymentDayBanner');
   if (!banner || !currentUser || currentUser.role === 'admin') return;
+  if (currentUser.exento_mantenimiento) { banner.classList.add('hidden'); return; }
   if (day >= 1 && day <= 10) {
     const fee = currentUser.fee || DB.settings?.defaultFee || 400;
     const monthLabel = `${_MONTH_NAMES[today.getMonth()]} ${today.getFullYear()}`;
@@ -141,6 +142,7 @@ function renderMyPayments() {
 
   const deptoNumEl    = document.getElementById('resDeptoNum');
   const deptoStatusEl = document.getElementById('resDeptoStatus');
+  const feeBlockEl    = document.getElementById('resFeeBlock');
   const feeEl         = document.getElementById('resFeeDisplay');
   const ctaEl         = document.getElementById('uploadCTAArea');
   const alertEl       = document.getElementById('deptoVerifAlert');
@@ -148,6 +150,16 @@ function renderMyPayments() {
   if (deptoNumEl)    deptoNumEl.textContent    = 'Depto ' + depto;
   if (deptoStatusEl) deptoStatusEl.textContent = status === 'approved' ? '✓ Verificado' : '⏳ Pendiente de verificación';
   if (feeEl)         feeEl.textContent         = fmt(fee);
+
+  const currentMonthLabelMP = `${_MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()}`;
+  const feeAlreadyPaidThisMonthMP = DB.payments.some(p =>
+    (p.residentId === currentUser.id || p.resident_id === currentUser.id ||
+     p.residentName === currentUser.name || p.resident_name === currentUser.name) &&
+    (p.category === 'Mantenimiento' || !p.category) &&
+    p.status === 'approved' &&
+    p.month === currentMonthLabelMP
+  );
+  if (feeBlockEl) feeBlockEl.classList.toggle('hidden', feeAlreadyPaidThisMonthMP || !!currentUser.exento_mantenimiento);
 
   const isApproved = status === 'approved';
   if (!isApproved) {
@@ -264,6 +276,7 @@ function renderMyAccount() {
   const rejected = myPays.filter(p => p.status === 'rejected');
   const totalPaid = approved.reduce((s,p) => s + Number(p.amount||0), 0);
   const fee = currentUser.fee || DB.settings?.defaultFee || 400;
+  const exento = !!currentUser.exento_mantenimiento;
 
   const area = document.getElementById('accountArea');
   if (!area) return;
@@ -272,13 +285,15 @@ function renderMyAccount() {
   const pendingFinesTotal = pendingFines.reduce((s,p) => s + Number(p.amount||0), 0);
 
   // No sumar la cuota mensual si ya hay un pago de Mantenimiento aprobado
-  // este mes — si no, "Total adeudado" seguía contando los $400 del mes ya
-  // pagado además de las multas/adeudos pendientes.
+  // este mes, o si el residente está exento — si no, "Total adeudado" seguía
+  // contando los $400 del mes ya pagado (o de una cuota que no le corresponde)
+  // además de las multas/adeudos pendientes.
   const currentMonthLabel = `${_MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()}`;
   const feeAlreadyPaidThisMonth = approved.some(p =>
     (p.category === 'Mantenimiento' || !p.category) && p.month === currentMonthLabel
   );
-  const totalOwed = (feeAlreadyPaidThisMonth ? 0 : fee) + pendingFinesTotal;
+  const showFeeTile = !exento && !feeAlreadyPaidThisMonth;
+  const totalOwed = (exento || feeAlreadyPaidThisMonth ? 0 : fee) + pendingFinesTotal;
 
   function statusLabel(p) {
     if (p.status === 'approved') return ['badge-approved', 'Pagado'];
@@ -290,9 +305,8 @@ function renderMyAccount() {
   area.innerHTML = `
     <div class="metrics" style="margin-bottom:1.5rem">
       <div class="metric"><div class="metric-label">Total pagado</div><div class="metric-value" style="color:var(--navy)">${fmt(totalPaid)}</div><div class="metric-change up">${approved.length} pagos aprobados</div></div>
-      <div class="metric"><div class="metric-label">En revisión</div><div class="metric-value" style="color:var(--c-amber)">${pending.length}</div><div class="metric-change">comprobantes pendientes</div></div>
-      <div class="metric"><div class="metric-label">Cuota mensual</div><div class="metric-value">${fmt(fee)}</div><div class="metric-change">mantenimiento</div></div>
-      ${pendingFinesTotal > 0 ? `<div class="metric" style="border-left:3px solid #dc2626"><div class="metric-label" style="color:#dc2626">Total adeudado este mes</div><div class="metric-value" style="color:#dc2626">${fmt(totalOwed)}</div><div class="metric-change">${feeAlreadyPaidThisMonth ? '' : 'cuota + '}${pendingFines.length} cargo(s) pendiente(s)</div></div>` : ''}
+      ${showFeeTile ? `<div class="metric"><div class="metric-label">Cuota mensual</div><div class="metric-value">${fmt(fee)}</div><div class="metric-change">mantenimiento</div></div>` : ''}
+      ${pendingFinesTotal > 0 ? `<div class="metric" style="border-left:3px solid #dc2626"><div class="metric-label" style="color:#dc2626">Total adeudado este mes</div><div class="metric-value" style="color:#dc2626">${fmt(totalOwed)}</div><div class="metric-change">${(exento || feeAlreadyPaidThisMonth) ? '' : 'cuota + '}${pendingFines.length} cargo(s) pendiente(s)</div></div>` : ''}
     </div>
     <div class="card">
       <div class="card-head"><span class="card-title">Estado de cuenta</span></div>
@@ -330,6 +344,13 @@ function openModalUploadPayment() {
   const status = res?.status || currentUser?.deptoStatus || currentUser?.depto_status || (currentUser?.depto ? 'approved' : 'pending');
   if (status !== 'approved') { showToast('Tu departamento aún no ha sido verificado', 'error'); return; }
   populatePayMonthOptions();
+  const payTypeSel = document.getElementById('payType');
+  if (payTypeSel) {
+    const options = currentUser?.exento_mantenimiento
+      ? [['Multa','Multa'],['Adeudo','Adeudo']]
+      : [['Mantenimiento','Mantenimiento mensual'],['Multa','Multa'],['Adeudo','Adeudo']];
+    payTypeSel.innerHTML = options.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
+  }
   document.getElementById('payAmount').value    = '';
   document.getElementById('payDate').value      = new Date().toISOString().split('T')[0];
   document.getElementById('uploadFileName').textContent = 'Sin archivo seleccionado';
