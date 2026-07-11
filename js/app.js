@@ -14,6 +14,7 @@ const fmtDate = d => {
   } catch(e) { return d||'—'; }
 };
 let chartFlow = null;
+let myFinChartInstance = null;
 
 /* ── DEMO LOGIN HELPER ──────────────────────────────────────── */
 function fillLogin(email, pass) {
@@ -59,6 +60,7 @@ async function goTo(page) {
     reports:      renderReports,
     myPayments:   renderMyPayments,
     myAccount:    renderMyAccount,
+    myFinances:   renderMyFinances,
     contacts:     renderContacts,
     editContacts: renderEditContacts,
     reglamento:   typeof renderReglamento === 'function' ? renderReglamento : null,
@@ -327,6 +329,59 @@ function renderMyAccount() {
         </tbody>
       </table></div>
     </div>`;
+}
+
+/* ── MY FINANCES (resident, solo lectura) ──────────────────── */
+async function renderMyFinances() {
+  const yearSel = document.getElementById('myFinChartYear');
+  const currentYear = new Date().getFullYear();
+  if (yearSel && yearSel.children.length === 0) {
+    for (let y = currentYear - 2; y <= currentYear; y++) {
+      const o = document.createElement('option'); o.value = y; o.textContent = y;
+      yearSel.appendChild(o);
+    }
+    yearSel.value = currentYear;
+  }
+  const year = Number(yearSel?.value || currentYear);
+
+  const client = window.SUPABASE?.client?.();
+  if (!client) return;
+  const { data, error } = await client.rpc('fn_resident_finances_summary', { p_year: year });
+  if (error) { console.error('fn_resident_finances_summary failed', error); return; }
+  const rows = data || [];
+
+  const totalIncome  = Number(rows[0]?.total_income)  || 0;
+  const totalExpense = Number(rows[0]?.total_expense) || 0;
+  const balance = totalIncome - totalExpense;
+
+  const area = document.getElementById('myFinMetrics');
+  if (area) area.innerHTML = `
+    <div class="metric"><div class="metric-label">Balance total</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div><div class="metric-change">Ingresos − Egresos</div></div>
+    <div class="metric"><div class="metric-label">Ingresos totales</div><div class="metric-value">${fmt(totalIncome)}</div><div class="metric-change up">↑ acumulado</div></div>
+    <div class="metric"><div class="metric-label">Egresos totales</div><div class="metric-value">${fmt(totalExpense)}</div><div class="metric-change down">↓ acumulado</div></div>`;
+
+  const allMonthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  // month_start viene como 'YYYY-MM-DD'; no usar `new Date(string)` directo
+  // (se interpreta como UTC medianoche y se corre un mes atrás en México) —
+  // mismo cuidado que ya usa fmtDate() al inicio de este archivo.
+  const monthIdxOf = s => { const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? +m[2]-1 : 0; };
+  const monthNames = rows.map(r => allMonthNames[monthIdxOf(r.month_start)]);
+  const incomes  = rows.map(r => Number(r.month_income)  || 0);
+  const expenses = rows.map(r => Number(r.month_expense) || 0);
+
+  if (myFinChartInstance) myFinChartInstance.destroy();
+  const ctx = document.getElementById('myFinChart');
+  if (ctx) myFinChartInstance = new Chart(ctx, {
+    type:'bar',
+    data:{labels:monthNames, datasets:[
+      {label:'Ingresos', data:incomes,  backgroundColor:'rgba(200,154,43,0.3)', borderColor:'var(--gold)', borderWidth:2, borderRadius:4},
+      {label:'Egresos',  data:expenses, backgroundColor:'rgba(139,32,32,0.2)',  borderColor:'var(--c-red)',  borderWidth:2, borderRadius:4}
+    ]},
+    options:{responsive:true, maintainAspectRatio:false,
+      plugins:{legend:{labels:{font:{size:11}, color:'#3F4750'}}},
+      scales:{x:{grid:{display:false}}, y:{grid:{color:'rgba(0,0,0,0.04)'}, ticks:{callback:v=>'$'+(v/1000).toFixed(0)+'k'}}}
+    }
+  });
 }
 
 /* ── UPLOAD VOUCHER (resident) ─────────────────────────────── */

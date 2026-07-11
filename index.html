@@ -164,6 +164,10 @@
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <span>Estado de cuenta</span>
           </div>
+          <div class="nav-item" onclick="goTo('myFinances')">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>
+            <span>Finanzas</span>
+          </div>
           <div class="nav-item" onclick="goTo('myReglamento')">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
             <span>Reglamento</span>
@@ -365,6 +369,19 @@
       <div id="pageMyAccount" class="page">
         <div class="page-header"><div class="page-title">Estado de cuenta</div><div class="page-sub">Historial de pagos y adeudos</div></div>
         <div id="accountArea"></div>
+      </div>
+
+      <!-- ── MY FINANCES (resident) ─────────────────── -->
+      <div id="pageMyFinances" class="page">
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div><div class="page-title">Finanzas</div><div class="page-sub">Resumen financiero de la privada</div></div>
+          <select id="myFinChartYear" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderMyFinances()"></select>
+        </div>
+        <div class="metrics" id="myFinMetrics"></div>
+        <div class="card">
+          <div class="card-head"><span class="card-title">Flujo mensual</span></div>
+          <div class="card-body"><div class="chart-wrap"><canvas id="myFinChart"></canvas></div></div>
+        </div>
       </div>
 
       <!-- ── CONTACTS (resident) ────────────────────── -->
