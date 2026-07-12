@@ -333,38 +333,70 @@ function renderMyAccount() {
 
 /* ── MY FINANCES (resident, solo lectura) ──────────────────── */
 async function renderMyFinances() {
-  const yearSel = document.getElementById('myFinChartYear');
-  const currentYear = new Date().getFullYear();
-  if (yearSel && yearSel.children.length === 0) {
-    for (let y = currentYear - 2; y <= currentYear; y++) {
-      const o = document.createElement('option'); o.value = y; o.textContent = y;
-      yearSel.appendChild(o);
-    }
-    yearSel.value = currentYear;
-  }
-  const year = Number(yearSel?.value || currentYear);
-
   const client = window.SUPABASE?.client?.();
   if (!client) return;
-  const { data, error } = await client.rpc('fn_resident_finances_summary', { p_year: year });
-  if (error) { console.error('fn_resident_finances_summary failed', error); return; }
-  const rows = data || [];
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonthLabel = `${today.toLocaleDateString('es-MX', { month: 'long' })} ${currentYear}`;
 
-  const totalIncome  = Number(rows[0]?.total_income)  || 0;
-  const totalExpense = Number(rows[0]?.total_expense) || 0;
-  const balance = totalIncome - totalExpense;
-
-  const area = document.getElementById('myFinMetrics');
-  if (area) area.innerHTML = `
-    <div class="metric"><div class="metric-label">Balance total</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div><div class="metric-change">Ingresos − Egresos</div></div>
-    <div class="metric"><div class="metric-label">Ingresos totales</div><div class="metric-value">${fmt(totalIncome)}</div><div class="metric-change up">↑ acumulado</div></div>
-    <div class="metric"><div class="metric-label">Egresos totales</div><div class="metric-value">${fmt(totalExpense)}</div><div class="metric-change down">↓ acumulado</div></div>`;
+  const [curRes, prevRes] = await Promise.all([
+    client.rpc('fn_resident_finances_summary', { p_year: currentYear, p_current_month_label: currentMonthLabel }),
+    client.rpc('fn_resident_finances_summary', { p_year: currentYear - 1, p_current_month_label: currentMonthLabel }),
+  ]);
+  if (curRes.error) { console.error('fn_resident_finances_summary failed', curRes.error); return; }
+  if (prevRes.error) { console.error('fn_resident_finances_summary failed', prevRes.error); return; }
+  const dataByYear = { [currentYear]: curRes.data || [], [currentYear - 1]: prevRes.data || [] };
 
   const allMonthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   // month_start viene como 'YYYY-MM-DD'; no usar `new Date(string)` directo
   // (se interpreta como UTC medianoche y se corre un mes atrás en México) —
   // mismo cuidado que ya usa fmtDate() al inicio de este archivo.
-  const monthIdxOf = s => { const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? +m[2]-1 : 0; };
+  function monthIdxOf(s) { const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? +m[2]-1 : 0; }
+  function halfRows(year, half) {
+    const rows = dataByYear[year] || [];
+    const startIdx = half === 1 ? 0 : 6;
+    return rows.filter(r => { const idx = monthIdxOf(r.month_start); return idx >= startIdx && idx < startIdx + 6; });
+  }
+  function halfHasData(year, half) {
+    return halfRows(year, half).some(r => Number(r.month_income) > 0 || Number(r.month_expense) > 0);
+  }
+
+  const options = [];
+  [currentYear - 1, currentYear].forEach(y => {
+    [1, 2].forEach(half => { if (halfHasData(y, half)) options.push({ year: y, half }); });
+  });
+  const currentHalf = today.getMonth() < 6 ? 1 : 2;
+  if (!options.some(o => o.year === currentYear && o.half === currentHalf)) {
+    options.push({ year: currentYear, half: currentHalf });
+  }
+  options.sort((a, b) => a.year - b.year || a.half - b.half);
+
+  const yearSel = document.getElementById('myFinChartYear');
+  if (yearSel && yearSel.children.length === 0) {
+    options.forEach(o => {
+      const opt = document.createElement('option');
+      opt.value = `${o.year}-${o.half}`;
+      opt.textContent = o.half === 1 ? `${o.year} (Ene-Jun)` : `${o.year} (Jul-Dic)`;
+      yearSel.appendChild(opt);
+    });
+    yearSel.value = `${currentYear}-${currentHalf}`;
+  }
+  const [selYearStr, selHalfStr] = (yearSel?.value || `${currentYear}-${currentHalf}`).split('-');
+  const rows = halfRows(Number(selYearStr), Number(selHalfStr));
+
+  const totalIncome  = Number((dataByYear[currentYear] || [])[0]?.total_income)  || 0;
+  const totalExpense = Number((dataByYear[currentYear] || [])[0]?.total_expense) || 0;
+  const balance = totalIncome - totalExpense;
+  const maintPaid  = Number((dataByYear[currentYear] || [])[0]?.maintenance_paid_count) || 0;
+  const maintTotal = Number((dataByYear[currentYear] || [])[0]?.maintenance_total_residents) || 0;
+
+  const area = document.getElementById('myFinMetrics');
+  if (area) area.innerHTML = `
+    <div class="metric"><div class="metric-label">Balance total</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div></div>
+    <div class="metric"><div class="metric-label">Ingresos totales</div><div class="metric-value">${fmt(totalIncome)}</div></div>
+    <div class="metric"><div class="metric-label">Egresos totales</div><div class="metric-value">${fmt(totalExpense)}</div></div>
+    <div class="metric"><div class="metric-label">Mantenimientos pagados</div><div class="metric-value">${maintPaid}/${maintTotal}</div></div>`;
+
   const monthNames = rows.map(r => allMonthNames[monthIdxOf(r.month_start)]);
   const incomes  = rows.map(r => Number(r.month_income)  || 0);
   const expenses = rows.map(r => Number(r.month_expense) || 0);
