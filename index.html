@@ -270,9 +270,10 @@
 
       <!-- ── VOUCHERS / ARCHIVOS (admin) ───────────── -->
       <div id="pageVouchers" class="page">
+        <div id="cleanupBlockBanner" class="hidden" style="background:#fef2f2;border:1px solid #fecaca;border-radius:var(--r-lg);padding:1rem 1.25rem;margin-bottom:1rem;color:#991b1b;font-weight:500"></div>
         <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
           <div><div class="page-title">Archivos por departamento</div><div class="page-sub">Comprobantes y recibos organizados en carpetas</div></div>
-          <button class="btn btn-gold btn-sm" onclick="downloadAndCleanup()">⬇ Descargar y limpiar</button>
+          <button class="btn btn-gold btn-sm" id="btnDownloadCleanup" onclick="downloadAndCleanup()">⬇ Descargar y limpiar</button>
         </div>
         <div id="vouchersArea"></div>
       </div>
@@ -732,7 +733,7 @@
 <script src="js/db.js?v=20260701"></script>
 <script src="js/data.js?v=20260702"></script>
 <script src="js/auth.js?v=20260702"></script>
-<script src="js/app.js?v=20260711"></script>
-<script src="js/admin.js?v=20260712"></script>
+<script src="js/app.js?v=20260712"></script>
+<script src="js/admin.js?v=20260712b"></script>
 </body>
 </html>

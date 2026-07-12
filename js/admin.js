@@ -871,6 +871,16 @@ function viewVoucher(id) {
 
 /* ── VOUCHERS BY FOLDER (organized by depto) ───────────────── */
 function renderVouchers() {
+  const today = new Date();
+  const day = today.getDate();
+  const btn = document.getElementById('btnDownloadCleanup');
+  if (btn) {
+    const inWindow = day >= 10 && day <= 15;
+    btn.disabled = !inWindow;
+    btn.style.opacity = inWindow ? '1' : '0.5';
+    btn.title = inWindow ? '' : 'Solo disponible del día 10 al 15 del mes';
+  }
+
   const area = document.getElementById('vouchersArea');
   if (!area) return;
 
@@ -1048,6 +1058,7 @@ async function downloadAndCleanup() {
   if (typeof renderFinances === 'function') renderFinances();
   if (typeof renderMyPayments === 'function') renderMyPayments();
   updatePendingCounts();
+  enforceCleanupBlock();
 
   if (clearedIds.length === toArchive.length) {
     showToast(`✓ ZIP descargado — ${clearedIds.length} comprobantes/recibos eliminados del storage (las filas se conservan)`);
@@ -1792,4 +1803,21 @@ async function checkAndApplyLateFees() {
     updatePendingCounts();
     if (document.getElementById('tblFines')) renderFines();
   }
+}
+
+/* ── BLOQUEO FORZOSO DE LIMPIEZA DE ARCHIVOS (día 16+) ───────── */
+function pendingCleanupBlock() {
+  const today = new Date();
+  if (today.getDate() <= 15) return false;
+  return DB.payments.some(p => p.status === 'approved' && ((p.receiptUrl||p.receipt_url) || (p.voucherUrl||p.voucher_url)));
+}
+
+function enforceCleanupBlock() {
+  const blocked = pendingCleanupBlock();
+  const banner = document.getElementById('cleanupBlockBanner');
+  if (banner) {
+    banner.classList.toggle('hidden', !blocked);
+    if (blocked) banner.textContent = `Antes de continuar, descarga y limpia los archivos del período — hoy es día ${new Date().getDate()}, la ventana para hacerlo (10-15) ya pasó.`;
+  }
+  return blocked;
 }

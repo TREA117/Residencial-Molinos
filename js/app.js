@@ -26,6 +26,9 @@ function fillLogin(email, pass) {
 
 /* ── NAVIGATION ────────────────────────────────────────────── */
 async function goTo(page) {
+  if (currentUser?.role === 'admin' && page !== 'vouchers' && typeof enforceCleanupBlock === 'function' && enforceCleanupBlock()) {
+    page = 'vouchers';
+  }
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   const pageEl = document.getElementById('page' + page.charAt(0).toUpperCase() + page.slice(1));
