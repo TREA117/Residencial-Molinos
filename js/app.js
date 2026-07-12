@@ -15,6 +15,7 @@ const fmtDate = d => {
 };
 let chartFlow = null;
 let myFinChartInstance = null;
+let myFinDataByYear = null;
 
 /* ── DEMO LOGIN HELPER ──────────────────────────────────────── */
 function fillLogin(email, pass) {
@@ -339,13 +340,16 @@ async function renderMyFinances() {
   const currentYear = today.getFullYear();
   const currentMonthLabel = `${today.toLocaleDateString('es-MX', { month: 'long' })} ${currentYear}`;
 
-  const [curRes, prevRes] = await Promise.all([
-    client.rpc('fn_resident_finances_summary', { p_year: currentYear, p_current_month_label: currentMonthLabel }),
-    client.rpc('fn_resident_finances_summary', { p_year: currentYear - 1, p_current_month_label: currentMonthLabel }),
-  ]);
-  if (curRes.error) { console.error('fn_resident_finances_summary failed', curRes.error); return; }
-  if (prevRes.error) { console.error('fn_resident_finances_summary failed', prevRes.error); return; }
-  const dataByYear = { [currentYear]: curRes.data || [], [currentYear - 1]: prevRes.data || [] };
+  if (!myFinDataByYear) {
+    const [curRes, prevRes] = await Promise.all([
+      client.rpc('fn_resident_finances_summary', { p_year: currentYear, p_current_month_label: currentMonthLabel }),
+      client.rpc('fn_resident_finances_summary', { p_year: currentYear - 1, p_current_month_label: currentMonthLabel }),
+    ]);
+    if (curRes.error) { console.error('fn_resident_finances_summary failed', curRes.error); return; }
+    if (prevRes.error) { console.error('fn_resident_finances_summary failed', prevRes.error); return; }
+    myFinDataByYear = { [currentYear]: curRes.data || [], [currentYear - 1]: prevRes.data || [] };
+  }
+  const dataByYear = myFinDataByYear;
 
   const allMonthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   // month_start viene como 'YYYY-MM-DD'; no usar `new Date(string)` directo
