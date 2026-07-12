@@ -875,7 +875,7 @@ function renderVouchers() {
   const day = today.getDate();
   const btn = document.getElementById('btnDownloadCleanup');
   if (btn) {
-    const inWindow = day >= 10 && day <= 15;
+    const inWindow = (day >= 10 && day <= 15) || pendingCleanupBlock();
     btn.disabled = !inWindow;
     btn.style.opacity = inWindow ? '1' : '0.5';
     btn.title = inWindow ? '' : 'Solo disponible del día 10 al 15 del mes';
