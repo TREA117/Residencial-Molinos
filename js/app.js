@@ -202,14 +202,10 @@ function renderMyPayments() {
         <td>${fmtDate(p.sentDate||p.sent_date)}</td>
         <td><span class="badge ${p.status==='approved'?'badge-approved':p.status==='pending'?'badge-pending':'badge-rejected'}">${p.status==='approved'?'Aprobado':p.status==='pending'?'En revisión':'Rechazado'}</span></td>
         <td>${(p.receiptNum||p.receipt_num)
-          ? `<button class="btn btn-secondary btn-sm" onclick="showReceipt(${p.id})">${p.receiptNum||p.receipt_num}</button>`
+          ? `<button class="btn btn-secondary btn-sm"${(p.receiptUrl||p.receipt_url)?'':' style="opacity:0.4"'} onclick="showReceipt(${p.id})">${p.receiptNum||p.receipt_num}</button>`
           : '—'}</td>
-        <td style="display:flex;gap:4px;flex-wrap:wrap">
-          <span class="badge ${(p.receiptUrl||p.receipt_url)?'badge-approved':'badge-rejected'}">${(p.receiptUrl||p.receipt_url)?'Recibo ✓':'Recibo ✕'}</span>
-          <span class="badge ${(p.voucherUrl||p.voucher_url)?'badge-approved':'badge-rejected'}">${(p.voucherUrl||p.voucher_url)?'Comprobante ✓':'Comprobante ✕'}</span>
-        </td>
       </tr>`).join('') ||
-      '<tr><td colspan="7" style="text-align:center;color:var(--mist);padding:1.5rem">Sin pagos registrados</td></tr>';
+      '<tr><td colspan="6" style="text-align:center;color:var(--mist);padding:1.5rem">Sin pagos registrados</td></tr>';
   }
 }
 
