@@ -108,22 +108,54 @@ function renderDashboard() {
 function renderCharts() {
   const approved = DB.payments.filter(p=>p.status==='approved');
   const txDate = p => p.approvedDate||p.approved_date||'';
-  const years = [...new Set(approved.map(p=>String(txDate(p)).slice(0,4)).filter(y=>/^\d{4}$/.test(y)))].sort();
+  const allMonthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+
+  const years = [...new Set(approved.map(p=>String(txDate(p)).slice(0,4)).filter(y=>/^\d{4}$/.test(y)))];
   const currentYear = String(new Date().getFullYear());
   if (!years.includes(currentYear)) years.push(currentYear);
   years.sort();
 
+  function halfHasData(year, half) {
+    const startMonth = half === 1 ? 0 : 6;
+    return approved.some(p => {
+      const m = String(txDate(p)).match(/^(\d{4})-(\d{2})/);
+      if (!m || m[1] !== year) return false;
+      const monthIdx = Number(m[2]) - 1;
+      return monthIdx >= startMonth && monthIdx < startMonth + 6;
+    });
+  }
+
+  const options = [];
+  years.forEach(y => {
+    [1, 2].forEach(half => {
+      if (halfHasData(y, half)) {
+        options.push({
+          value: `${y}-${half}`,
+          label: half === 1 ? `${y} (Ene-Jun)` : `${y} (Jul-Dic)`,
+        });
+      }
+    });
+  });
+  // Siempre incluir el semestre actual aunque no tenga datos, para que el
+  // filtro nunca quede vacío en un dashboard recién estrenado.
+  const today = new Date();
+  const currentHalf = today.getMonth() < 6 ? 1 : 2;
+  const currentValue = `${currentYear}-${currentHalf}`;
+  if (!options.some(o => o.value === currentValue)) {
+    options.push({ value: currentValue, label: currentHalf === 1 ? `${currentYear} (Ene-Jun)` : `${currentYear} (Jul-Dic)` });
+  }
+  options.sort((a, b) => a.value.localeCompare(b.value));
+
   const yearSel = document.getElementById('chartFlowYear');
   if (yearSel && yearSel.children.length === 0) {
-    years.forEach(y=>{ const o=document.createElement('option'); o.value=y; o.textContent=y; yearSel.appendChild(o); });
-    yearSel.value = years.includes(currentYear) ? currentYear : years[years.length-1];
+    options.forEach(o => { const opt = document.createElement('option'); opt.value = o.value; opt.textContent = o.label; yearSel.appendChild(opt); });
+    yearSel.value = currentValue;
   }
-  const year = yearSel?.value || currentYear;
+  const [selYear, selHalf] = (yearSel?.value || currentValue).split('-');
+  const startIdx = selHalf === '1' ? 0 : 6;
 
-  const allMonthNames = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-  const startIdx = year === currentYear ? 4 : 0; // este año: arranca en mayo
-  const monthNames = allMonthNames.slice(startIdx);
-  const mKeys = monthNames.map((_,i)=>`${year}-${String(startIdx+i+1).padStart(2,'0')}`);
+  const monthNames = allMonthNames.slice(startIdx, startIdx + 6);
+  const mKeys = monthNames.map((_,i)=>`${selYear}-${String(startIdx+i+1).padStart(2,'0')}`);
   const incomes  = mKeys.map(m=>approved.filter(p=>p.type==='income' &&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
   const expenses = mKeys.map(m=>approved.filter(p=>p.type==='expense'&&String(txDate(p)).startsWith(m)).reduce((s,p)=>s+Number(p.amount||0),0));
   if (chartFlow) chartFlow.destroy();
