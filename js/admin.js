@@ -1514,32 +1514,36 @@ async function deleteReglamento() {
 
 /* ── MULTAS Y ADEUDOS (admin) ────────────────────────────────── */
 function renderFines() {
-  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-  const fines = DB.payments.filter(p => p.resident_id && (p.category === 'Multa' || p.category === 'Adeudo') && p.status === 'pending')
-    .sort((a,b) => (b.created_at||'').localeCompare(a.created_at||''));
+  const depto = document.getElementById('filterFineDepto')?.value || '';
+  const fines = DB.payments.filter(p =>
+    (p.residentId||p.resident_id) &&
+    (p.category==='Multa'||p.category==='Adeudo') &&
+    p.status==='pending' &&
+    (!depto || p.depto === depto)
+  );
+
+  const deptoSel = document.getElementById('filterFineDepto');
+  if (deptoSel && deptoSel.children.length === 1) {
+    const allFines = DB.payments.filter(p => (p.residentId||p.resident_id) && (p.category==='Multa'||p.category==='Adeudo') && p.status==='pending');
+    [...new Set(allFines.map(p=>p.depto).filter(Boolean))].sort().forEach(d=>{
+      const o=document.createElement('option'); o.value=d; o.textContent=d; deptoSel.appendChild(o);
+    });
+  }
+
   const tbody = document.getElementById('tblFines');
   if (!tbody) return;
-  if (!fines.length) {
-    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--mist);padding:1.5rem">Sin multas ni adeudos registrados</td></tr>';
-    return;
-  }
-  tbody.innerHTML = fines.map(p => {
-    const badgeClass = p.status === 'approved' ? 'badge-approved' : p.status === 'rejected' ? 'badge-rejected' : 'badge-pending';
-    const badgeLabel = p.status === 'approved' ? 'Pagado' : p.status === 'rejected' ? 'Rechazado' : 'Pendiente';
-    return `<tr>
-      <td>${escH(p.resident_name||p.residentName||'—')}</td>
-      <td><strong>${escH(p.depto||'—')}</strong></td>
-      <td><span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}">${escH(p.category)}</span></td>
-      <td style="max-width:200px;white-space:normal">${escH(p.description||'—')}</td>
-      <td>${fmt(p.amount)}</td>
-      <td>${escH(p.month||'—')}</td>
-      <td><span class="badge ${badgeClass}">${badgeLabel}</span></td>
-      <td>
-        ${p.status!=='approved'?`<button class="btn btn-sm btn-gold" onclick="markFinePaid('${escH(p.id)}')">Marcar pagado</button> `:''}
-        <button class="btn btn-sm" style="background:#fee2e2;color:#b91c1c" onclick="deleteFine('${escH(p.id)}')">Eliminar</button>
-      </td>
-    </tr>`;
-  }).join('');
+  tbody.innerHTML = fines.map(p => `<tr>
+    <td>${escH(p.resident_name||p.residentName||'—')}</td>
+    <td><strong>${escH(p.depto||'—')}</strong></td>
+    <td><span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}">${escH(p.category)}</span></td>
+    <td style="max-width:200px;white-space:normal">${escH(p.description||'—')}</td>
+    <td>${fmt(p.amount)}</td>
+    <td>${escH(p.month||'—')}</td>
+    <td>
+      <button class="btn btn-sm btn-success" style="min-width:90px" onclick="markFinePaid('${escH(p.id)}')">Pagado</button>
+      <button class="btn btn-sm" style="min-width:90px;background:#fee2e2;color:#b91c1c" onclick="deleteFine('${escH(p.id)}')">Eliminar</button>
+    </td>
+  </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--mist);padding:1.5rem">Sin cargos pendientes</td></tr>';
 }
 
 function openAddFineModal() {
@@ -1704,7 +1708,7 @@ async function deleteFine(id) {
     if (!client) throw new Error('Sin conexión con Supabase');
     const { error } = await client.from('payments').delete().eq('id', id);
     if (error) throw error;
-    DB.payments = DB.payments.filter(p => p.id !== id);
+    DB.payments = DB.payments.filter(p => String(p.id) !== String(id));
     renderFines();
     showToast('Cargo eliminado');
   } catch(e) {

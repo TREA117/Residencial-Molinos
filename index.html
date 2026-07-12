@@ -406,11 +406,16 @@
       <div id="pageFines" class="page">
         <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
           <div><div class="page-title">Multas y adeudos</div><div class="page-sub">Cargos adicionales por departamento</div></div>
-          <button class="btn btn-gold btn-sm" onclick="openAddFineModal()">+ Agregar cargo</button>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <select id="filterFineDepto" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderFines()">
+              <option value="">Todos los deptos</option>
+            </select>
+            <button class="btn btn-gold btn-sm" onclick="openAddFineModal()">+ Agregar cargo</button>
+          </div>
         </div>
         <div class="card">
           <div class="tbl-wrap"><table>
-            <thead><tr><th>Residente</th><th>Depto</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>Mes</th><th>Estado</th><th>Acciones</th></tr></thead>
+            <thead><tr><th>Residente</th><th>Depto</th><th>Tipo</th><th>Descripción</th><th>Monto</th><th>Mes</th><th>Acciones</th></tr></thead>
             <tbody id="tblFines"></tbody>
           </table></div>
         </div>
@@ -723,6 +728,6 @@
 <script src="js/data.js?v=20260702"></script>
 <script src="js/auth.js?v=20260702"></script>
 <script src="js/app.js?v=20260711"></script>
-<script src="js/admin.js?v=20260711"></script>
+<script src="js/admin.js?v=20260712"></script>
 </body>
 </html>
