@@ -310,7 +310,12 @@
 
       <!-- ── REPORTS (admin) ────────────────────────── -->
       <div id="pageReports" class="page">
-        <div class="page-header"><div class="page-title">Reportes</div><div class="page-sub">Estado de cobros del mes en curso</div></div>
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">
+          <div><div class="page-title">Reportes</div><div class="page-sub">Estado de cobros del mes en curso</div></div>
+          <select id="filterReportTorre" style="padding:5px 10px;border:1px solid var(--c-border);border-radius:var(--r-sm);font-size:13px" onchange="renderReports()">
+            <option value="">Todas las torres</option>
+          </select>
+        </div>
         <div class="card" style="margin-bottom:1rem">
           <div class="card-head"><span class="card-title">Resumen financiero — mes actual</span></div>
           <div class="metrics" id="reportSummary" style="padding:1rem 1.25rem"></div>

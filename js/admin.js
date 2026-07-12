@@ -1329,6 +1329,16 @@ async function renderReports() {
       showToast('Error al cargar el reporte: '+(e?.message||e), 'error');
     }
   }
+
+  const torreOf = depto => String(depto||'').replace(/[A-Za-z]+$/,'');
+  const torreSel = document.getElementById('filterReportTorre');
+  if (torreSel && torreSel.children.length === 1) {
+    [...new Set(rows.map(r=>torreOf(r.depto)).filter(Boolean))]
+      .sort((a,b)=>Number(a)-Number(b))
+      .forEach(t=>{ const o=document.createElement('option'); o.value=t; o.textContent=t; torreSel.appendChild(o); });
+  }
+  const torreFilter = torreSel?.value || '';
+  if (torreFilter) rows = rows.filter(r => torreOf(r.depto) === torreFilter);
   const remanenteSiguiente = remanente + ingresosMes - egresosMes;
   const summary = document.getElementById('reportSummary');
   if (summary) summary.innerHTML = `
