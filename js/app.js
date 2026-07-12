@@ -304,9 +304,8 @@ function renderMyAccount() {
 
   area.innerHTML = `
     <div class="metrics" style="margin-bottom:1.5rem">
-      <div class="metric"><div class="metric-label">Total pagado</div><div class="metric-value" style="color:var(--navy)">${fmt(totalPaid)}</div><div class="metric-change up">${approved.length} pagos aprobados</div></div>
       ${showFeeTile ? `<div class="metric"><div class="metric-label">Cuota mensual</div><div class="metric-value">${fmt(fee)}</div><div class="metric-change">mantenimiento</div></div>` : ''}
-      ${pendingFinesTotal > 0 ? `<div class="metric" style="border-left:3px solid #dc2626"><div class="metric-label" style="color:#dc2626">Total adeudado este mes</div><div class="metric-value" style="color:#dc2626">${fmt(totalOwed)}</div><div class="metric-change">${(exento || feeAlreadyPaidThisMonth) ? '' : 'cuota + '}${pendingFines.length} cargo(s) pendiente(s)</div></div>` : ''}
+      ${pendingFinesTotal > 0 ? `<div class="metric" style="border-left:3px solid #dc2626"><div class="metric-label" style="color:#dc2626">Total adeudado este mes</div><div class="metric-value" style="color:#dc2626">-${fmt(totalOwed)}</div><div class="metric-change">${(exento || feeAlreadyPaidThisMonth) ? '' : 'cuota + '}${pendingFines.length} cargo(s) pendiente(s)</div></div>` : ''}
     </div>
     <div class="card">
       <div class="card-head"><span class="card-title">Estado de cuenta</span></div>
