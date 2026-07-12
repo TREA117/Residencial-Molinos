@@ -335,7 +335,6 @@ function renderPayments() {
 }
 
 function openCashPaymentModal() {
-  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   // Residentes autorizados ordenados por depto
   const sel = document.getElementById('cashResidentId');
   sel.innerHTML = visibleResidents()
@@ -343,7 +342,19 @@ function openCashPaymentModal() {
     .sort((a, b) => (a.depto||'').localeCompare(b.depto||''))
     .map(r => `<option value="${escH(r.id)}">${escH(r.depto)} — ${escH(r.name)}</option>`)
     .join('');
-  // Últimos 12 meses + mes actual
+  document.getElementById('cashAmount').value = DB.settings?.defaultFee || 400;
+  document.getElementById('cashDate').value   = new Date().toISOString().split('T')[0];
+  document.getElementById('cashNotes').value  = '';
+  document.getElementById('cashType').value   = 'Mantenimiento';
+  document.getElementById('cashFineSection')?.classList.add('hidden');
+  document.getElementById('cashFullYear').checked = false;
+  document.getElementById('cashFullYearField')?.classList.remove('hidden');
+  onCashFullYearChange();
+  openModal('modalCashPayment');
+}
+
+function _populateCashMonthOptions() {
+  const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const mSel = document.getElementById('cashMonth');
   const now = new Date();
   const opts = [];
@@ -353,15 +364,14 @@ function openCashPaymentModal() {
     opts.push(`<option value="${label}"${i===0?' selected':''}>${label}</option>`);
   }
   mSel.innerHTML = opts.join('');
-  document.getElementById('cashAmount').value = DB.settings?.defaultFee || 400;
-  document.getElementById('cashDate').value   = now.toISOString().split('T')[0];
-  document.getElementById('cashNotes').value  = '';
-  document.getElementById('cashType').value   = 'Mantenimiento';
-  document.getElementById('cashFineSection')?.classList.add('hidden');
-  document.getElementById('cashFullYear').checked = false;
-  document.getElementById('cashFullYearField')?.classList.remove('hidden');
-  onCashFullYearChange();
-  openModal('modalCashPayment');
+}
+
+function _populateCashYearOptions() {
+  const mSel = document.getElementById('cashMonth');
+  const currentYear = new Date().getFullYear();
+  mSel.innerHTML = [currentYear, currentYear + 1]
+    .map(y => `<option value="${y}"${y===currentYear?' selected':''}>${y}</option>`)
+    .join('');
 }
 
 function onCashTypeChange() {
@@ -383,8 +393,13 @@ function onCashTypeChange() {
 
 function onCashFullYearChange() {
   const fullYear = document.getElementById('cashFullYear').checked;
-  document.getElementById('cashMonthLabel').textContent = fullYear ? 'Año (elige cualquier mes de ese año)' : 'Mes de pago';
+  document.getElementById('cashMonthLabel').textContent = fullYear ? 'Año' : 'Mes de pago';
   document.getElementById('cashAmountLabel').textContent = fullYear ? 'Monto mensual ($)' : 'Monto ($)';
+  if (fullYear) {
+    _populateCashYearOptions();
+  } else {
+    _populateCashMonthOptions();
+  }
 }
 
 function submitCashPayment() {
@@ -525,7 +540,7 @@ async function saveCashPaymentFullYear() {
   const resident = DB.residents.find(r => r.id === residentId);
   if (!resident) { showToast('Residente no encontrado', 'error'); return; }
 
-  const year = monthSel.split(' ').pop();
+  const year = monthSel;
   const today = new Date().toISOString().split('T')[0];
 
   const alreadyPaidMonths = new Set(
