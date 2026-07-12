@@ -334,6 +334,7 @@ function doLogout() {
   stopInactivityWatch();
   currentUser = null;
   myFinDataByYear = null;
+  myFinGeneration++;
   if (myFinChartInstance) { myFinChartInstance.destroy(); myFinChartInstance = null; }
   const myFinChartYearEl = document.getElementById('myFinChartYear');
   if (myFinChartYearEl) myFinChartYearEl.innerHTML = '';

@@ -16,6 +16,7 @@ const fmtDate = d => {
 let chartFlow = null;
 let myFinChartInstance = null;
 let myFinDataByYear = null;
+let myFinGeneration = 0;
 
 /* ── DEMO LOGIN HELPER ──────────────────────────────────────── */
 function fillLogin(email, pass) {
@@ -341,12 +342,14 @@ async function renderMyFinances() {
   const currentMonthLabel = `${today.toLocaleDateString('es-MX', { month: 'long' })} ${currentYear}`;
 
   if (!myFinDataByYear) {
+    const generationAtFetchStart = myFinGeneration;
     const [curRes, prevRes] = await Promise.all([
       client.rpc('fn_resident_finances_summary', { p_year: currentYear, p_current_month_label: currentMonthLabel }),
       client.rpc('fn_resident_finances_summary', { p_year: currentYear - 1, p_current_month_label: currentMonthLabel }),
     ]);
     if (curRes.error) { console.error('fn_resident_finances_summary failed', curRes.error); return; }
     if (prevRes.error) { console.error('fn_resident_finances_summary failed', prevRes.error); return; }
+    if (generationAtFetchStart !== myFinGeneration) return; // sesión cerrada mientras se esperaba la respuesta — descartar
     myFinDataByYear = { [currentYear]: curRes.data || [], [currentYear - 1]: prevRes.data || [] };
   }
   const dataByYear = myFinDataByYear;
