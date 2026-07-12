@@ -333,6 +333,10 @@ function doLogout() {
   clearSession();
   stopInactivityWatch();
   currentUser = null;
+  myFinDataByYear = null;
+  if (myFinChartInstance) { myFinChartInstance.destroy(); myFinChartInstance = null; }
+  const myFinChartYearEl = document.getElementById('myFinChartYear');
+  if (myFinChartYearEl) myFinChartYearEl.innerHTML = '';
   document.getElementById('appScreen').classList.add('hidden');
   document.getElementById('authScreen').classList.remove('hidden');
   document.getElementById('formLogin').classList.remove('hidden');
