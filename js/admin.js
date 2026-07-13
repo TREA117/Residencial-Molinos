@@ -71,17 +71,28 @@ function renderDashboard() {
   const totalIncome    = approved.filter(p=>p.type==='income').reduce((s,p)=>s+Number(p.amount||0),0);
   const totalExpense   = approved.filter(p=>p.type==='expense').reduce((s,p)=>s+Number(p.amount||0),0);
   const balance        = totalIncome - totalExpense;
-  const approvedRes    = visibleResidents().filter(r=>r.status==='approved').length;
-  const pendingRes     = visibleResidents().filter(r=>r.status==='pending').length;
+
+  const approvedResidentsList = visibleResidents().filter(r=>r.status==='approved');
+  const nonExemptRes   = approvedResidentsList.filter(r=>!r.exento_mantenimiento).length;
+  const exemptCount    = approvedResidentsList.filter(r=>r.exento_mantenimiento).length;
+
+  const currentMonthLabel = `${MONTHS_ES[new Date().getMonth()]} ${new Date().getFullYear()}`;
+  const maintPaidCount = new Set(
+    DB.payments.filter(p =>
+      p.status==='approved' &&
+      (p.category==='Mantenimiento' || !p.category) &&
+      p.month === currentMonthLabel
+    ).map(p => p.residentId || p.resident_id)
+  ).size;
 
   populateMonthFilter('dashMonth', approvedAll, p=>p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'');
 
   const area = document.getElementById('metricsArea');
   if (area) area.innerHTML = `
-    <div class="metric"><div class="metric-label">Balance${hasFilter?' (filtrado)':' total'}</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div><div class="metric-change">Ingresos − Egresos</div></div>
-    <div class="metric"><div class="metric-label">Ingresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalIncome)}</div><div class="metric-change up">↑ acumulado</div></div>
-    <div class="metric"><div class="metric-label">Egresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalExpense)}</div><div class="metric-change down">↓ acumulado</div></div>
-    <div class="metric"><div class="metric-label">Residentes activos</div><div class="metric-value">${approvedRes}</div><div class="metric-change">${pendingRes} pendientes de auth</div></div>`;
+    <div class="metric"><div class="metric-label">Balance${hasFilter?' (filtrado)':' total'}</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div></div>
+    <div class="metric"><div class="metric-label">Ingresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalIncome)}</div></div>
+    <div class="metric"><div class="metric-label">Egresos${hasFilter?' (filtrado)':' totales'}</div><div class="metric-value">${fmt(totalExpense)}</div></div>
+    <div class="metric"><div class="metric-label">Mantenimientos pagados</div><div class="metric-value">${maintPaidCount}/${nonExemptRes}</div><div class="metric-change">${exemptCount} exento(s)</div></div>`;
 
   renderCharts();
 

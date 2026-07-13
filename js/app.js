@@ -392,15 +392,16 @@ async function renderMyFinances() {
   const totalIncome  = Number((dataByYear[currentYear] || [])[0]?.total_income)  || 0;
   const totalExpense = Number((dataByYear[currentYear] || [])[0]?.total_expense) || 0;
   const balance = totalIncome - totalExpense;
-  const maintPaid  = Number((dataByYear[currentYear] || [])[0]?.maintenance_paid_count) || 0;
-  const maintTotal = Number((dataByYear[currentYear] || [])[0]?.maintenance_total_residents) || 0;
+  const maintPaid   = Number((dataByYear[currentYear] || [])[0]?.maintenance_paid_count) || 0;
+  const maintTotal  = Number((dataByYear[currentYear] || [])[0]?.maintenance_total_residents) || 0;
+  const maintExempt = Number((dataByYear[currentYear] || [])[0]?.maintenance_exempt_count) || 0;
 
   const area = document.getElementById('myFinMetrics');
   if (area) area.innerHTML = `
     <div class="metric"><div class="metric-label">Balance total</div><div class="metric-value" style="color:${balance>=0?'var(--navy)':'var(--c-red)'}">${fmt(balance)}</div></div>
     <div class="metric"><div class="metric-label">Ingresos totales</div><div class="metric-value">${fmt(totalIncome)}</div></div>
     <div class="metric"><div class="metric-label">Egresos totales</div><div class="metric-value">${fmt(totalExpense)}</div></div>
-    <div class="metric"><div class="metric-label">Mantenimientos pagados</div><div class="metric-value">${maintPaid}/${maintTotal}</div></div>`;
+    <div class="metric"><div class="metric-label">Mantenimientos pagados</div><div class="metric-value">${maintPaid}/${maintTotal}</div><div class="metric-change">${maintExempt} exento(s)</div></div>`;
 
   const monthNames = rows.map(r => allMonthNames[monthIdxOf(r.month_start)]);
   const incomes  = rows.map(r => Number(r.month_income)  || 0);
