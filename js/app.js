@@ -91,6 +91,14 @@ function updatePendingCounts() {
 /* ── PAYMENT DAY BANNER (days 1-10 of month) ──────────────── */
 const _MONTH_NAMES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 
+/* Un pago "cubre" un mes si coincide exactamente con ese mes (caso normal),
+   o si es un registro de año completo (covers_full_year) para ese mismo año
+   — evita que el pago de año completo deje de "contar" para cualquier mes
+   que no sea aquel en el que se registró. */
+function paymentCoversMonth(p, monthLabel, year) {
+  return p.month === monthLabel || (p.coversFullYear && Number(p.periodYear) === year);
+}
+
 function checkPaymentBanner() {
   const today = new Date();
   const day   = today.getDate();
@@ -110,7 +118,7 @@ function checkPaymentBanner() {
        p.residentName === currentUser.name || p.resident_name === currentUser.name) &&
       (p.category === 'Mantenimiento' || !p.category) &&
       p.status === 'approved' &&
-      p.month === monthLabel
+      paymentCoversMonth(p, monthLabel, today.getFullYear())
     );
 
     banner.classList.remove('hidden');
@@ -164,7 +172,7 @@ function renderMyPayments() {
      p.residentName === currentUser.name || p.resident_name === currentUser.name) &&
     (p.category === 'Mantenimiento' || !p.category) &&
     p.status === 'approved' &&
-    p.month === currentMonthLabelMP
+    paymentCoversMonth(p, currentMonthLabelMP, new Date().getFullYear())
   );
   if (feeBlockEl) feeBlockEl.classList.toggle('hidden', feeAlreadyPaidThisMonthMP || !!currentUser.exento_mantenimiento);
 
@@ -293,7 +301,7 @@ function renderMyAccount() {
   // además de las multas/adeudos pendientes.
   const currentMonthLabel = `${_MONTH_NAMES[new Date().getMonth()]} ${new Date().getFullYear()}`;
   const feeAlreadyPaidThisMonth = approved.some(p =>
-    (p.category === 'Mantenimiento' || !p.category) && p.month === currentMonthLabel
+    (p.category === 'Mantenimiento' || !p.category) && paymentCoversMonth(p, currentMonthLabel, new Date().getFullYear())
   );
   const showFeeTile = !exento && !feeAlreadyPaidThisMonth;
   const totalOwed = (exento || feeAlreadyPaidThisMonth ? 0 : fee) + pendingFinesTotal;
@@ -580,7 +588,7 @@ function buildReceiptHTML(p) {
   const _esc         = typeof escH === 'function' ? escH : s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const concept      = _esc((p.category === 'Multa' || p.category === 'Adeudo')
     ? (p.description || p.category)
-    : 'Cuota de mantenimiento mensual');
+    : (p.coversFullYear ? `Cuota de mantenimiento — Año completo ${p.periodYear || ''}`.trim() : 'Cuota de mantenimiento mensual'));
 
   return `
     <div class="receipt">
