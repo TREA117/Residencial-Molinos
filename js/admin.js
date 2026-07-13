@@ -77,11 +77,12 @@ function renderDashboard() {
   const exemptCount    = approvedResidentsList.filter(r=>r.exento_mantenimiento).length;
 
   const currentMonthLabel = `${MONTHS_ES[new Date().getMonth()]} ${new Date().getFullYear()}`;
+  const currentYearNum = new Date().getFullYear();
   const maintPaidCount = new Set(
     DB.payments.filter(p =>
       p.status==='approved' &&
       (p.category==='Mantenimiento' || !p.category) &&
-      p.month === currentMonthLabel
+      paymentCoversMonth(p, currentMonthLabel, currentYearNum)
     ).map(p => p.residentId || p.resident_id)
   ).size;
 
@@ -574,10 +575,10 @@ async function saveCashPaymentFullYear() {
   const MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   const residentId = document.getElementById('cashResidentId').value;
   const monthSel   = document.getElementById('cashMonth').value;
-  const amount     = parseFloat(document.getElementById('cashAmount').value);
+  const monthlyAmount = parseFloat(document.getElementById('cashAmount').value);
   const payDate    = document.getElementById('cashDate').value;
   const notes      = document.getElementById('cashNotes').value.trim();
-  if (!residentId || !monthSel || !amount || !payDate) {
+  if (!residentId || !monthSel || !monthlyAmount || !payDate) {
     showToast('Completa todos los campos requeridos', 'error'); return;
   }
   const resident = DB.residents.find(r => r.id === residentId);
@@ -599,24 +600,23 @@ async function saveCashPaymentFullYear() {
   }
 
   const btn = document.querySelector('#modalCashPayment .btn-gold');
-  if (btn) { btn.disabled = true; btn.textContent = `Registrando ${monthsToInsert.length} meses...`; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Registrando...'; }
 
   try {
-    const newRows = monthsToInsert.map((monthName, idx) => {
-      const mm = String(MONTHS.indexOf(monthName) + 1).padStart(2, '0');
-      return {
-        resident_id: residentId, resident_name: resident.name,
-        depto: resident.depto, month: `${monthName} ${year}`, amount,
-        status: 'approved', type: 'income',
-        description: `Cuota mantenimiento ${monthName} ${year} — Depto ${resident.depto}`,
-        category: 'Mantenimiento',
-        payment_date: payDate, approved_date: today,
-        receipt_num: `${year}-${mm}-${resident.depto}`,
-        notes: notes || `Pago en efectivo (año completo ${year}) registrado por administración`,
-      };
-    });
+    const totalAmount = monthlyAmount * monthsToInsert.length;
+    const newRow = {
+      resident_id: residentId, resident_name: resident.name,
+      depto: resident.depto, month: `Año completo ${year}`, amount: totalAmount,
+      status: 'approved', type: 'income',
+      description: `Cuota mantenimiento año completo ${year} — Depto ${resident.depto}`,
+      category: 'Mantenimiento',
+      payment_date: payDate, approved_date: today,
+      receipt_num: `${year}-ANUAL-${resident.depto}`,
+      covers_full_year: true, period_year: Number(year),
+      notes: notes || `Pago en efectivo (año completo ${year}, ${monthsToInsert.length} mes(es)) registrado por administración`,
+    };
 
-    const rows = await window.SUPABASE.insert('payments', newRows);
+    const rows = await window.SUPABASE.insert('payments', newRow);
     const insertedRows = Array.isArray(rows) ? rows : [rows];
     if (!insertedRows.length) throw new Error('Sin respuesta del servidor');
 
@@ -625,6 +625,7 @@ async function saveCashPaymentFullYear() {
       residentId: row.resident_id, residentName: row.resident_name,
       receiptNum: row.receipt_num, receiptUrl: null,
       paymentDate: row.payment_date, approvedDate: row.approved_date,
+      coversFullYear: !!row.covers_full_year, periodYear: row.period_year ?? null,
       hasVoucher: false,
     }));
     DB.payments.push(...insertedPayments);
@@ -632,7 +633,7 @@ async function saveCashPaymentFullYear() {
     try {
       const notifRows = await window.SUPABASE.insert('notifications', {
         user_id: residentId,
-        message: `Se registraron ${insertedPayments.length} pagos de mantenimiento del año ${year} por administración. Ya puedes ver tus recibos.`,
+        message: `Se registró tu pago de mantenimiento del año ${year} (${monthsToInsert.length} mes(es)) por administración. Ya puedes ver tu recibo.`,
         is_read: false,
       });
       const notifRow = Array.isArray(notifRows) ? notifRows[0] : notifRows;
@@ -641,9 +642,8 @@ async function saveCashPaymentFullYear() {
 
     closeModal('modalCashPayment');
     renderPayments();
-    showToast(`✓ ${insertedPayments.length} meses de ${year} registrados — generando recibos...`);
+    showToast(`✓ Año ${year} registrado (${monthsToInsert.length} mes(es)) — generando recibo...`);
 
-    // Generar y subir los recibos en secuencia (uno por mes)
     for (const p of insertedPayments) {
       try {
         const blob = await generateReceiptImageBlob(p);
@@ -657,7 +657,7 @@ async function saveCashPaymentFullYear() {
     }
     if (typeof renderMyPayments === 'function') renderMyPayments();
     if (typeof renderVouchers === 'function') renderVouchers();
-    showToast(`✓ Recibos del año ${year} generados`);
+    showToast(`✓ Recibo del año ${year} generado`);
   } catch(e) {
     console.error('Error al registrar el año completo', e);
     showToast('Error: ' + (e?.message||e), 'error');
@@ -1770,7 +1770,7 @@ async function checkAndApplyLateFees() {
     // ¿Ya pagó el mantenimiento de este mes (aprobado o comprobante en revisión)?
     const hasPaid = DB.payments.some(p =>
       (p.resident_id === rid || p.residentId === rid) &&
-      p.month === currentMonthStr &&
+      paymentCoversMonth(p, currentMonthStr, today.getFullYear()) &&
       (!p.category || p.category === 'Mantenimiento') &&
       (p.status === 'approved' || p.status === 'pending')
     );
