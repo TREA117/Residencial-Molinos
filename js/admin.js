@@ -438,7 +438,7 @@ function onCashTypeChange() {
 function onCashFullYearChange() {
   const fullYear = document.getElementById('cashFullYear').checked;
   document.getElementById('cashMonthLabel').textContent = fullYear ? 'Año' : 'Mes de pago';
-  document.getElementById('cashAmountLabel').textContent = fullYear ? 'Monto mensual ($)' : 'Monto ($)';
+  document.getElementById('cashAmountLabel').textContent = 'Monto ($)';
   if (fullYear) {
     _populateCashYearOptions();
   } else {
