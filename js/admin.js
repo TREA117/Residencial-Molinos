@@ -587,6 +587,18 @@ async function saveCashPaymentFullYear() {
   const year = monthSel;
   const today = new Date().toISOString().split('T')[0];
 
+  // Un pago de año completo ya registrado es UNA fila llamada "Año completo
+  // {year}" (covers_full_year=true) — nunca coincide con "{mes} {year}", así
+  // que el check de meses de abajo no la detectaría. Sin este check, volver a
+  // registrar el año completo insertaría una segunda fila y cobraría doble.
+  const alreadyCoversFullYear = DB.payments.some(p =>
+    (p.resident_id === residentId || p.residentId === residentId) &&
+    p.coversFullYear && Number(p.periodYear) === Number(year)
+  );
+  if (alreadyCoversFullYear) {
+    showToast(`Ese residente ya tiene el año ${year} pagado como registro único`, 'error'); return;
+  }
+
   const alreadyPaidMonths = new Set(
     DB.payments.filter(p =>
       (p.resident_id === residentId || p.residentId === residentId) &&
