@@ -30,6 +30,8 @@ Se sirve directamente desde GitHub Pages — un solo `git push` actualiza la app
 ```
 Residencial-Molinos-main/
 ├── index.html              ← TODA la estructura HTML + modales + config Supabase
+├── privacidad.html         ← Política de privacidad (requerida por App Store/Play Store)
+├── terminos.html           ← Términos y condiciones
 ├── css/styles.css          ← Paleta navy/gold — NO modificar variables de color sin autorización
 ├── js/
 │   ├── supabase.js         ← Cliente Supabase (REST + supabase-js). NO tocar salvo bugs.
@@ -40,16 +42,23 @@ Residencial-Molinos-main/
 │   └── admin.js            ← Vistas admin: dashboard, residentes, comprobantes, archivos, finanzas, reportes, contactos editor
 ├── assets/
 │   ├── LogoM3.svg          ← Logo oficial (preferir siempre SVG)
-│   └── LogoM3.jpg          ← Fallback
+│   ├── LogoM3.jpg          ← Fallback
+│   └── firma-administracion.png ← Firma real usada en recibos generados
+├── docs/superpowers/       ← Specs y planes de features (metodología superpowers)
+├── mobile/                 ← App Expo/React Native separada (mismo Supabase) — ver mobile/AGENTS.md
+├── supabase/                ← Config local de Supabase CLI (no confundir con el proyecto remoto)
 └── CLAUDE.md               ← Este archivo
 ```
+
+No hay archivos `.sql` de migración en el repo — se aplicaron directo a Supabase y se eliminaron
+tras usarse (ver sección "SQL de migración" más abajo).
 
 ---
 
 ## Supabase
 - **URL base**: `https://qxjuztctbpwymmskdyqw.supabase.co/rest/v1/`
 - **Anon key**: está en `index.html` en `window.SUPABASE_CONFIG`
-- **RLS**: activado en `users`/`payments`/`notifications`/`settings` y en `storage.objects`, con políticas reales por rol (ver `supabase-migration-auth-native.sql`, sección "FASE 2 — Endurecimiento de RLS"). Un residente solo lee/escribe su propia fila/pagos; solo `role='admin'` (función `is_admin()`) tiene acceso completo. Al agregar cualquier query nueva, verificar que respete esta separación — no asumir acceso libre a otras tablas/filas.
+- **RLS**: activado en `users`/`payments`/`notifications`/`settings` y en `storage.objects`, con políticas reales por rol. Un residente solo lee/escribe su propia fila/pagos; solo `role='admin'` (función `is_admin()`) tiene acceso completo. Al agregar cualquier query nueva, verificar que respete esta separación — no asumir acceso libre a otras tablas/filas. El SQL que definió esta política (`supabase-migration-auth-native.sql`) ya se aplicó a Supabase y se eliminó del repo por no tener uso activo (commit `6d0c7e3`) — el schema vivo está en Supabase, no en un archivo local; usa el MCP de Supabase o el SQL Editor del dashboard para inspeccionarlo.
 
 ### Tablas en Supabase (esquema real)
 
@@ -143,10 +152,32 @@ id, default_fee (numeric), contacts (jsonb), created_at
 
 ---
 
-## Cuentas de prueba actuales en Supabase
-- `admin@molino.com` / `admin123` → rol admin
-- Edson Aldair Trejo Ramirez (`edson_al6@hotmail.com`) → residente real, depto 10G, approved
-- Por el momento solo existen estas dos cuentas (la vieja `persona@gmail.com` de prueba ya no es válida — no usarla como referencia).
+## Cuentas en Supabase
+
+El login usa **Supabase Auth nativo** (`signInWithPassword` en `js/auth.js`), no una tabla de
+contraseñas propia — la fila en `public.users` es solo el perfil (rol, depto, fee), la contraseña
+vive en `auth.users`. Si una fila de `public.users` tiene `auth_synced=false`, puede ser una cuenta
+legacy nunca vinculada a Auth (`signInWithPassword` siempre falla con "Credenciales incorrectas"
+hasta vincularla vía `reconcile_user_auth_id`, ver comentarios en `doLogin()`/`doRegister()`).
+
+**Cuentas demo** (uso interno para probar la app, `auth_synced=true`, contraseña verificada 2026-07-31):
+- `admin@molino.com` / `Admin2026!` → rol admin
+- `residente.demo@molino.com` / `Residente2026!` → rol resident, depto REV1, approved
+
+⚠️ La cuenta `admin@molino.com` fue borrada por completo de Supabase (auth.users + perfil,
+vía el RPC `delete_resident_complete`) entre el 2026-07-23 y el 2026-07-31 — probablemente por
+una ejecución manual del RPC desde el SQL Editor apuntando al id equivocado, no por la UI
+(`syncResidentsFromUsers()` en `data.js` ya excluye `role='admin'` de la lista de Residentes,
+así que no se puede borrar por accidente desde el panel). Se recreó el 2026-07-31 con nuevo
+`id` de auth (perfil viejo `52502424-...` quedó anonimizado y huérfano, sin pagos/notificaciones
+asociados — se dejó así, no se limpió). Si vuelve a fallar el login de esta cuenta, verificar
+primero si sigue existiendo en `auth.users` antes de asumir que es un problema de contraseña.
+
+**Ya no son las únicas cuentas.** Al 2026-07-23 hay ~30 residentes reales registrados en producción
+(ver `public.users`) más una cuenta admin real, todos aprobados y en uso — sus correos/contraseñas
+son datos personales de residentes reales y no se documentan aquí. No usar contraseñas viejas
+documentadas en commits/specs pasados como referencia sin antes verificar en Supabase — se han
+reseteado al menos una vez.
 
 ---
 
@@ -172,5 +203,8 @@ git checkout -- js/app.js
 
 ---
 
-## SQL de migración completo
-Ver archivo `supabase-migration.sql` en la raíz del proyecto.
+## SQL de migración
+No hay archivo `.sql` en el repo — las migraciones (`supabase-migration-auth-native.sql`,
+`supabase-migration-v2.sql`) ya se aplicaron a Supabase y se eliminaron del repo por no tener uso
+activo. Para inspeccionar o modificar el schema real, usa el MCP de Supabase (`execute_sql`,
+`list_tables`, `apply_migration`) o el SQL Editor del dashboard — no un archivo local.
