@@ -1,9 +1,28 @@
 # Real Molinos 3 — Privada
 ## Sistema de Gestión de Condominio
 
+Dos apps sobre la misma base de Supabase:
+- **Web** (raíz de este repo) — HTML/CSS/JS vanilla, sin build, se sirve directo desde GitHub Pages.
+- **Mobile** (`mobile/`) — Expo/React Native, repo git propio, documentación propia
+  (`mobile/AGENTS.md`, `mobile/CLAUDE-DEV.md`, `mobile/CLAUDE-DESIGN.md`).
+
+## Estado actual (2026-07-23)
+
+| | Estado |
+|---|---|
+| **Web** | Live en producción — https://trea117.github.io/Residencial-Molinos |
+| **Mobile / Android** | Publicada en Google Play |
+| **Mobile / iOS** | `1.0.0` build `8` — en revisión de App Store Connect / TestFlight, con testers activos |
+| **Supabase** | Proyecto `Molinos` (`qxjuztctbpwymmskdyqw`), RLS activo, ~30 residentes reales aprobados |
+
+Para agentes/desarrolladores: las reglas de comportamiento y el detalle técnico de cada app viven en
+su propio `CLAUDE.md` (web: este directorio; mobile: `mobile/`) — este README es solo el mapa
+general. El historial de features ya implementadas está en [`docs/README.md`](docs/README.md), no
+hace falta leerlo para trabajar en el estado actual del proyecto.
+
 ---
 
-## Diagrama del proceso de la aplicación
+## Diagrama del proceso de la aplicación (web — el flujo de mobile es equivalente)
 
 ```
 ╔══════════════════════════════════════════════════════════════════════╗
@@ -111,16 +130,21 @@ ARCHIVOS Y LIMPIEZA AUTOMÁTICA:
                          BASE DE DATOS (SUPABASE)
 ═══════════════════════════════════════════════════════════════════════
 
-Tablas:
-  users       → id, name, email, password_hash, role, phone, depto, depto_status, fee
-  residents   → id, name, email, phone, depto, status, fee, user_id
-  payments    → id, resident_id, resident_name, depto, month, amount, status,
-                sent_date, approved_date, receipt_num, voucher_url, payment_date
-  finances    → id, date, description, category, type, amount, reference, notes
-  contacts    → gestionados en DB local (db.js) y editables por admin
+Tablas (ver detalle completo en CLAUDE.md):
+  users         → id, name, email, password_hash, role, phone, depto, depto_status, fee
+  payments      → unifica pagos de residentes E ingresos/egresos de admin — id, resident_id,
+                  resident_name, depto, month, amount, status, type (income|expense), description,
+                  category, reference, notes, sent_date, payment_date, approved_date, receipt_num,
+                  receipt_url, voucher_url
+  notifications → id, user_id, message, is_read, created_at
+  settings      → fila única (id=1): default_fee, contacts (jsonb)
+
+No existen tablas `residents` ni `finances` separadas — todo pago/transacción vive en `payments`
+con el campo `type`, y los contactos viven en `settings.contacts` (no en db.js local).
 
 Storage buckets:
   comprobantes/ → imágenes de comprobantes subidas por residentes
+  recibos/      → recibos JPEG generados por admin al aprobar un pago
 
 ---
 
@@ -139,9 +163,12 @@ real-molinos-3/
 │   ├── app.js          ← Vistas del residente
 │   └── admin.js        ← Vistas del administrador
 └── assets/
-    ├── LogoM3.svg      ← Logo oficial (preferido)
-    └── LogoM3.jpg      ← Logo oficial (fallback)
+    ├── LogoM3.svg               ← Logo oficial (preferido)
+    ├── LogoM3.jpg               ← Logo oficial (fallback)
+    └── firma-administracion.png ← Firma real usada en recibos generados
 ```
+
+`mobile/` no comparte código con lo de arriba — ver su propia estructura en `mobile/CLAUDE-DEV.md`.
 
 ---
 
@@ -166,10 +193,15 @@ real-molinos-3/
 
 ---
 
-## SQL para Supabase
+## Supabase
 
-Ejecuta el archivo `supabase-migration.sql` en el SQL Editor de Supabase para:
-- Agregar columna `voucher_url` a payments
-- Verificar los 2 usuarios demo
-- Desactivar RLS en todas las tablas
-- Crear índices de rendimiento
+No hay archivo de migración `.sql` en el repo — el schema ya vive en Supabase (proyecto `Molinos`,
+ref `qxjuztctbpwymmskdyqw`) y se administra vía SQL Editor del dashboard o el MCP de Supabase.
+
+**RLS está ACTIVO** en `users`/`payments`/`notifications`/`settings` y `storage.objects`, con
+políticas reales por rol (un residente solo ve su propia fila/pagos; solo `role='admin'` tiene
+acceso completo vía `is_admin()`). No desactivar RLS.
+
+Cuentas demo para probar la app (ver CLAUDE.md para credenciales vigentes):
+- `admin@molino.com` → rol admin
+- `residente.demo@molino.com` → rol resident, depto REV1
