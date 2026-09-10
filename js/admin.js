@@ -338,10 +338,10 @@ async function saveNewResident() {
 /* ── PAYMENTS / VOUCHERS (admin) ───────────────────────────── */
 function renderPayments() {
   const depto     = document.getElementById('filterPayDepto')?.value||'';
-  // Multas y adeudos se gestionan en "Multas / Adeudos", no en Comprobantes
+  // Multas, adeudos y cuotas extraordinarias se gestionan en "Multas / Adeudos", no en Comprobantes
   const residentPays = DB.payments.filter(p =>
     (p.residentId||p.resident_id) &&
-    p.category !== 'Multa' && p.category !== 'Adeudo'
+    p.category !== 'Multa' && p.category !== 'Adeudo' && p.category !== 'Extraordinaria'
   );
   const pending   = residentPays.filter(p=>p.status==='pending');
   const all       = residentPays.filter(p=>p.status!=='rejected').filter(p=>!depto||p.depto===depto);
@@ -422,7 +422,7 @@ function onCashTypeChange() {
   const type = document.getElementById('cashType').value;
   const section = document.getElementById('cashFineSection');
   const fullYearField = document.getElementById('cashFullYearField');
-  if (type === 'Multa' || type === 'Adeudo') {
+  if (type === 'Multa' || type === 'Adeudo' || type === 'Extraordinaria') {
     section?.classList.remove('hidden');
     _populateCashFineSelect();
     // El registro de año completo solo aplica a mantenimiento mensual.
@@ -456,7 +456,7 @@ function submitCashPayment() {
 
 function onCashResidentChange() {
   const type = document.getElementById('cashType')?.value;
-  if (type === 'Multa' || type === 'Adeudo') _populateCashFineSelect();
+  if (type === 'Multa' || type === 'Adeudo' || type === 'Extraordinaria') _populateCashFineSelect();
 }
 
 function _populateCashFineSelect() {
@@ -466,7 +466,7 @@ function _populateCashFineSelect() {
   if (!sel) return;
   const fines = DB.payments.filter(p =>
     (p.resident_id === residentId || p.residentId === residentId) &&
-    (p.category === 'Multa' || p.category === 'Adeudo') &&
+    (p.category === 'Multa' || p.category === 'Adeudo' || p.category === 'Extraordinaria') &&
     p.status === 'pending' &&
     (!type || p.category === type)
   );
@@ -485,7 +485,7 @@ async function saveCashPayment() {
   if (!residentId || !month || !amount || !payDate) {
     showToast('Completa todos los campos requeridos', 'error'); return;
   }
-  if ((category === 'Multa' || category === 'Adeudo') && !linkedFineId) {
+  if ((category === 'Multa' || category === 'Adeudo' || category === 'Extraordinaria') && !linkedFineId) {
     showToast('Selecciona el cargo pendiente a saldar antes de registrar', 'error'); return;
   }
   const resident = DB.residents.find(r => r.id === residentId);
@@ -495,7 +495,7 @@ async function saveCashPayment() {
   const mm   = String(d.getMonth() + 1).padStart(2, '0');
   const yyyy = d.getFullYear();
   const receiptNum = `${yyyy}-${mm}-${resident.depto}`;
-  const descMap = { Mantenimiento: 'Cuota mantenimiento', Multa: 'Multa', Adeudo: 'Adeudo' };
+  const descMap = { Mantenimiento: 'Cuota mantenimiento', Multa: 'Multa', Adeudo: 'Adeudo', Extraordinaria: 'Cuota extraordinaria' };
   const desc = `${descMap[category]||category} ${month} — Depto ${resident.depto}`;
   const today = new Date().toISOString().split('T')[0];
 
@@ -686,12 +686,12 @@ async function approvePayment(id) {
   const yyyy  = today.getFullYear();
   const approvedDate = today.toISOString().split('T')[0];
   const receiptNum   = `${yyyy}-${mm}-${p.depto||'XXX'}`;
-  // Preservar la categoría original (Mantenimiento/Multa/Adeudo): antes se
-  // forzaba a 'Mantenimiento' aquí mismo, lo que hacía que el chequeo de
-  // abajo (multa/adeudo) nunca se cumpliera y el cargo vinculado jamás se
-  // descontara.
+  // Preservar la categoría original (Mantenimiento/Multa/Adeudo/Extraordinaria):
+  // antes se forzaba a 'Mantenimiento' aquí mismo, lo que hacía que el chequeo
+  // de abajo (multa/adeudo/extraordinaria) nunca se cumpliera y el cargo
+  // vinculado jamás se descontara.
   const category = p.category || 'Mantenimiento';
-  const descMap = { Mantenimiento: 'Cuota mantenimiento', Multa: 'Multa', Adeudo: 'Adeudo' };
+  const descMap = { Mantenimiento: 'Cuota mantenimiento', Multa: 'Multa', Adeudo: 'Adeudo', Extraordinaria: 'Cuota extraordinaria' };
   const desc = `${descMap[category]||category} ${p.month} — Depto ${p.depto}`;
 
   try {
@@ -712,8 +712,8 @@ async function approvePayment(id) {
   renderPayments();
   updatePendingCounts();
 
-  // Si el comprobante aprobado corresponde a una multa/adeudo, descontar del cargo pendiente
-  if (category === 'Multa' || category === 'Adeudo') {
+  // Si el comprobante aprobado corresponde a una multa/adeudo/extraordinaria, descontar del cargo pendiente
+  if (category === 'Multa' || category === 'Adeudo' || category === 'Extraordinaria') {
     const rid = p.resident_id || p.residentId;
     const linkedFine = DB.payments.find(f =>
       String(f.id) !== String(id) &&
@@ -909,7 +909,7 @@ function renderVouchers() {
 
   // Group by depto — excluye multas/adeudos sin recibo (aún pendientes de pago)
   const byDepto = {};
-  DB.payments.filter(p => (p.residentId||p.resident_id) && !((p.category==='Multa'||p.category==='Adeudo') && !(p.receiptNum||p.receipt_num))).forEach(p => {
+  DB.payments.filter(p => (p.residentId||p.resident_id) && !((p.category==='Multa'||p.category==='Adeudo'||p.category==='Extraordinaria') && !(p.receiptNum||p.receipt_num))).forEach(p => {
     const d = p.depto||'SIN-DEPTO';
     if (!byDepto[d]) byDepto[d] = [];
     byDepto[d].push(p);
@@ -930,7 +930,7 @@ function renderVouchers() {
 }
 
 function openDeptoFolder(depto) {
-  const pays = DB.payments.filter(p => (p.residentId||p.resident_id) && (p.depto||'SIN-DEPTO')===depto && !((p.category==='Multa'||p.category==='Adeudo') && !(p.receiptNum||p.receipt_num)));
+  const pays = DB.payments.filter(p => (p.residentId||p.resident_id) && (p.depto||'SIN-DEPTO')===depto && !((p.category==='Multa'||p.category==='Adeudo'||p.category==='Extraordinaria') && !(p.receiptNum||p.receipt_num)));
   document.getElementById('folderTitle').textContent = 'Depto ' + depto;
   document.getElementById('folderBody').innerHTML = `
     <table style="width:100%">
@@ -1561,14 +1561,14 @@ function renderFines() {
   const depto = document.getElementById('filterFineDepto')?.value || '';
   const fines = DB.payments.filter(p =>
     (p.residentId||p.resident_id) &&
-    (p.category==='Multa'||p.category==='Adeudo') &&
+    (p.category==='Multa'||p.category==='Adeudo'||p.category==='Extraordinaria') &&
     p.status==='pending' &&
     (!depto || p.depto === depto)
   );
 
   const deptoSel = document.getElementById('filterFineDepto');
   if (deptoSel && deptoSel.children.length === 1) {
-    const allFines = DB.payments.filter(p => (p.residentId||p.resident_id) && (p.category==='Multa'||p.category==='Adeudo') && p.status==='pending');
+    const allFines = DB.payments.filter(p => (p.residentId||p.resident_id) && (p.category==='Multa'||p.category==='Adeudo'||p.category==='Extraordinaria') && p.status==='pending');
     [...new Set(allFines.map(p=>p.depto).filter(Boolean))].sort().forEach(d=>{
       const o=document.createElement('option'); o.value=d; o.textContent=d; deptoSel.appendChild(o);
     });
@@ -1579,7 +1579,7 @@ function renderFines() {
   tbody.innerHTML = fines.map(p => `<tr>
     <td>${escH(p.resident_name||p.residentName||'—')}</td>
     <td><strong>${escH(p.depto||'—')}</strong></td>
-    <td><span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}">${escH(p.category)}</span></td>
+    <td><span class="badge ${p.category==='Multa'?'badge-rejected':p.category==='Extraordinaria'?'badge-gold':'badge-pending'}">${escH(p.category)}</span></td>
     <td style="max-width:200px;white-space:normal">${escH(p.description||'—')}</td>
     <td>${fmt(p.amount)}</td>
     <td>${escH(p.month||'—')}</td>
@@ -1641,8 +1641,10 @@ async function saveFine() {
     else DB.payments.push(row);
 
     // Notificar al residente
+    const fineNounMap = { Multa: 'multa', Adeudo: 'adeudo', Extraordinaria: 'cuota extraordinaria' };
+    const fineNoun = fineNounMap[category] || category.toLowerCase();
     try {
-      const msg = `Se registró una ${category.toLowerCase()} en tu cuenta por $${amount}: "${description}". Por favor acércate a administración.`;
+      const msg = `Se registró una ${fineNoun} en tu cuenta por $${amount}: "${description}". Por favor acércate a administración.`;
       const notifRows = await window.SUPABASE.insert('notifications', { user_id: residentId, message: msg, is_read: false });
       const notifRow = Array.isArray(notifRows) ? notifRows[0] : notifRows;
       if (notifRow && typeof normalizeNotification === 'function') DB.notifications.push(normalizeNotification(notifRow));
@@ -1650,7 +1652,7 @@ async function saveFine() {
 
     closeModal('modalAddFine');
     renderFines();
-    showToast(`✓ ${category} agregada a Depto ${resident.depto}`);
+    showToast(`✓ ${fineNoun.charAt(0).toUpperCase()+fineNoun.slice(1)} agregada a Depto ${resident.depto}`);
   } catch(e) {
     showToast('Error: ' + (e?.message||e), 'error');
   } finally {

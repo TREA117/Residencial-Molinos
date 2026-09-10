@@ -104,6 +104,7 @@ FLUJO DE PAGO (días 1–10 del mes: banner de recordatorio activo):
 │  ├── Residentes           ← autorizar/rechazar/editar/eliminar   │
 │  ├── Comprobantes         ← revisar y aprobar pagos              │
 │  ├── Archivos             ← carpetas por departamento            │
+│  ├── Multas / Adeudos     ← cargos puntuales por residente       │
 │  ├── Ingresos / Egresos   ← CSV import, registro manual          │
 │  ├── Reportes             ← estado de cobros del mes             │
 │  └── Editar contactos     ← teléfonos que ven los residentes     │
@@ -113,6 +114,17 @@ GESTIÓN DE RESIDENTES:
   Registro pendiente → Admin ve solicitud → Autoriza o Rechaza
   Si autoriza: residente puede entrar y subir comprobantes
   Si rechaza:  residente no puede acceder a la app
+
+CARGOS PUNTUALES (Multas / Adeudos / Cuotas extraordinarias):
+  El admin crea el cargo desde "Multas / Adeudos" → elige tipo (Multa, Adeudo o
+  Cuota extraordinaria), residente, monto y descripción. El residente ve el cargo
+  pendiente en su "Estado de cuenta" y lo salda subiendo comprobante (o el admin lo
+  registra como pago en efectivo, vinculándolo al cargo). A diferencia de la cuota
+  de mantenimiento mensual, estos cargos no se generan automáticamente y no se
+  mezclan con la lista de cuotas regulares del residente hasta ser saldados.
+  "Cuota extraordinaria" usa el mismo mecanismo que Multa/Adeudo — pensado para
+  derramas o gastos extraordinarios del condominio (ej. mantenimiento mayor,
+  reparaciones no presupuestadas) que se cobran a un residente en particular.
 
 ARCHIVOS Y LIMPIEZA AUTOMÁTICA:
   ┌────────────────────────────────────────────────────────────┐

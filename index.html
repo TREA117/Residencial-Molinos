@@ -520,6 +520,7 @@
           <option value="Mantenimiento">Mantenimiento mensual</option>
           <option value="Multa">Multa</option>
           <option value="Adeudo">Adeudo</option>
+          <option value="Extraordinaria">Cuota extraordinaria</option>
         </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -623,6 +624,7 @@
           <option value="Mantenimiento">Mantenimiento mensual</option>
           <option value="Multa">Multa</option>
           <option value="Adeudo">Adeudo</option>
+          <option value="Extraordinaria">Cuota extraordinaria</option>
         </select>
       </div>
       <div id="cashFineSection" class="hidden">
@@ -695,13 +697,14 @@
 <!-- Add Fine/Debt (Admin) -->
 <div class="modal-overlay" id="modalAddFine">
   <div class="modal" style="max-width:420px">
-    <div class="modal-head"><span class="modal-title">Agregar multa o adeudo</span><button class="modal-close" onclick="closeModal('modalAddFine')">✕</button></div>
+    <div class="modal-head"><span class="modal-title">Agregar cargo (multa, adeudo o cuota extraordinaria)</span><button class="modal-close" onclick="closeModal('modalAddFine')">✕</button></div>
     <div class="modal-body">
       <div class="field"><label for="fineResidentId">Residente</label><select id="fineResidentId"></select></div>
       <div class="field"><label for="fineType">Tipo de cargo</label>
         <select id="fineType">
           <option value="Multa">Multa</option>
           <option value="Adeudo">Adeudo</option>
+          <option value="Extraordinaria">Cuota extraordinaria</option>
         </select>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
@@ -733,7 +736,7 @@
 <script src="js/db.js?v=20260701"></script>
 <script src="js/data.js?v=20260712"></script>
 <script src="js/auth.js?v=20260712"></script>
-<script src="js/app.js?v=20260712c"></script>
-<script src="js/admin.js?v=20260713"></script>
+<script src="js/app.js?v=20260910"></script>
+<script src="js/admin.js?v=20260910"></script>
 </body>
 </html>

@@ -77,7 +77,7 @@ async function goTo(page) {
 
 function updatePendingCounts() {
   const pRes = DB.residents.filter(r => r.status === 'pending').length;
-  const pPay = DB.payments.filter(p => p.status === 'pending' && p.category !== 'Multa' && p.category !== 'Adeudo').length;
+  const pPay = DB.payments.filter(p => p.status === 'pending' && p.category !== 'Multa' && p.category !== 'Adeudo' && p.category !== 'Extraordinaria').length;
   ['pendingResCount','pendingResCount2'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = pRes; el.classList.toggle('hidden', pRes === 0); }
@@ -200,7 +200,7 @@ function renderMyPayments() {
   const myPays = DB.payments.filter(p =>
     (p.residentId === currentUser.id || p.resident_id === currentUser.id ||
      p.residentName === currentUser.name || p.resident_name === currentUser.name) &&
-    p.category !== 'Multa' && p.category !== 'Adeudo'
+    p.category !== 'Multa' && p.category !== 'Adeudo' && p.category !== 'Extraordinaria'
   );
   const tbody = document.getElementById('tblMyPayments');
   if (tbody) {
@@ -291,7 +291,7 @@ function renderMyAccount() {
 
   const area = document.getElementById('accountArea');
   if (!area) return;
-  const isFineCharge = p => (p.category === 'Multa' || p.category === 'Adeudo') && !p.voucher_url && !p.voucherUrl;
+  const isFineCharge = p => (p.category === 'Multa' || p.category === 'Adeudo' || p.category === 'Extraordinaria') && !p.voucher_url && !p.voucherUrl;
   const pendingFines = myPays.filter(p => p.status === 'pending' && isFineCharge(p));
   const pendingFinesTotal = pendingFines.reduce((s,p) => s + Number(p.amount||0), 0);
 
@@ -327,7 +327,7 @@ function renderMyAccount() {
             const [badgeCls, label] = statusLabel(p);
             return `<tr>
               <td>${escH(p.month||'—')}</td>
-              <td>${p.category && p.category !== 'Mantenimiento' ? `<span class="badge ${p.category==='Multa'?'badge-rejected':'badge-pending'}" style="font-size:11px">${escH(p.category)}</span> ` : ''}${escH(p.description||'Cuota de mantenimiento')}</td>
+              <td>${p.category && p.category !== 'Mantenimiento' ? `<span class="badge ${p.category==='Multa'?'badge-rejected':p.category==='Extraordinaria'?'badge-gold':'badge-pending'}" style="font-size:11px">${escH(p.category)}</span> ` : ''}${escH(p.description||'Cuota de mantenimiento')}</td>
               <td>${fmt(p.amount)}</td>
               <td>${p.approvedDate||p.approved_date ? fmtDate(p.approvedDate||p.approved_date) : p.sentDate||p.sent_date ? fmtDate(p.sentDate||p.sent_date) : '—'}</td>
               <td><span class="badge ${badgeCls}">${label}</span></td>
@@ -448,8 +448,8 @@ function openModalUploadPayment() {
   const payTypeSel = document.getElementById('payType');
   if (payTypeSel) {
     const options = currentUser?.exento_mantenimiento
-      ? [['Multa','Multa'],['Adeudo','Adeudo']]
-      : [['Mantenimiento','Mantenimiento mensual'],['Multa','Multa'],['Adeudo','Adeudo']];
+      ? [['Multa','Multa'],['Adeudo','Adeudo'],['Extraordinaria','Cuota extraordinaria']]
+      : [['Mantenimiento','Mantenimiento mensual'],['Multa','Multa'],['Adeudo','Adeudo'],['Extraordinaria','Cuota extraordinaria']];
     payTypeSel.innerHTML = options.map(([v,l]) => `<option value="${v}">${l}</option>`).join('');
   }
   document.getElementById('payAmount').value    = '';
@@ -586,7 +586,7 @@ function buildReceiptHTML(p) {
   const approvedDate = p.approvedDate || p.approved_date || new Date().toISOString().split('T')[0];
   const resName      = p.residentName || p.resident_name || '—';
   const _esc         = typeof escH === 'function' ? escH : s => String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const concept      = _esc((p.category === 'Multa' || p.category === 'Adeudo')
+  const concept      = _esc((p.category === 'Multa' || p.category === 'Adeudo' || p.category === 'Extraordinaria')
     ? (p.description || p.category)
     : (p.coversFullYear ? `Cuota de mantenimiento — Año completo ${p.periodYear || ''}`.trim() : 'Cuota de mantenimiento mensual'));
 
