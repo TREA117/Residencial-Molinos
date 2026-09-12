@@ -485,7 +485,7 @@ async function saveCashPayment() {
   if (!residentId || !month || !amount || !payDate) {
     showToast('Completa todos los campos requeridos', 'error'); return;
   }
-  if ((category === 'Multa' || category === 'Adeudo' || category === 'Extraordinaria') && !linkedFineId) {
+  if ((category === 'Multa' || category === 'Adeudo') && !linkedFineId) {
     showToast('Selecciona el cargo pendiente a saldar antes de registrar', 'error'); return;
   }
   const resident = DB.residents.find(r => r.id === residentId);

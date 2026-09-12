@@ -14,3 +14,6 @@ mobile/
 # OS
 .DS_Store
 Thumbs.db
+
+# Memoria interna del equipo — nunca se sube al repo remoto
+PLAN.md
