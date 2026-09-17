@@ -6,6 +6,16 @@ function escH(s) {
   return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
 }
 
+/* 'Mes Año' derivado de una fecha 'YYYY-MM-DD' — usado como valor de
+   compatibilidad para payments.month en flujos donde el mes ya no se le pide
+   al usuario (Cuota extraordinaria). Reutiliza _MONTH_NAMES (global, definido
+   en app.js, cargado antes que este archivo). */
+function _monthLabelFromDate(dateStr) {
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const d = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(dateStr);
+  return `${_MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
+
 /* DB.residents sin las cuentas de revisión de Google Play — usar esto (no
    DB.residents directo) en toda tabla, select o conteo que vea el admin. */
 function visibleResidents() {
@@ -393,6 +403,12 @@ function openCashPaymentModal() {
   document.getElementById('cashFineSection')?.classList.add('hidden');
   document.getElementById('cashFullYear').checked = false;
   document.getElementById('cashFullYearField')?.classList.remove('hidden');
+  // Restablecer visibilidad del campo "Mes de pago" — se oculta cuando el
+  // tipo es Extraordinaria (ver onCashTypeChange) y aquí siempre se reabre
+  // el modal con el tipo por defecto (Mantenimiento).
+  document.getElementById('cashMonthField')?.classList.remove('hidden');
+  const cashMonthGrid = document.getElementById('cashMonthAmountGrid');
+  if (cashMonthGrid) cashMonthGrid.style.gridTemplateColumns = '1fr 1fr';
   onCashFullYearChange();
   openModal('modalCashPayment');
 }
@@ -422,17 +438,33 @@ function onCashTypeChange() {
   const type = document.getElementById('cashType').value;
   const section = document.getElementById('cashFineSection');
   const fullYearField = document.getElementById('cashFullYearField');
-  if (type === 'Multa' || type === 'Adeudo' || type === 'Extraordinaria') {
+  const monthField = document.getElementById('cashMonthField');
+  const monthGrid = document.getElementById('cashMonthAmountGrid');
+  const hasLinkedCharge = type === 'Multa' || type === 'Adeudo';
+  const isExtraordinaria = type === 'Extraordinaria';
+
+  // "Cargo pendiente a saldar" solo aplica a Multa/Adeudo — una cuota
+  // extraordinaria no se vincula a un cargo previamente creado en este flujo.
+  if (hasLinkedCharge) {
     section?.classList.remove('hidden');
     _populateCashFineSelect();
-    // El registro de año completo solo aplica a mantenimiento mensual.
+  } else {
+    section?.classList.add('hidden');
+  }
+
+  // El registro de año completo solo aplica a mantenimiento mensual.
+  if (hasLinkedCharge || isExtraordinaria) {
     fullYearField?.classList.add('hidden');
     document.getElementById('cashFullYear').checked = false;
     onCashFullYearChange();
   } else {
-    section?.classList.add('hidden');
     fullYearField?.classList.remove('hidden');
   }
+
+  // Una cuota extraordinaria no se vincula a un mes específico — el pago
+  // queda registrado solo con la fecha de pago (#cashDate).
+  monthField?.classList.toggle('hidden', isExtraordinaria);
+  if (monthGrid) monthGrid.style.gridTemplateColumns = isExtraordinaria ? '1fr' : '1fr 1fr';
 }
 
 function onCashFullYearChange() {
@@ -456,7 +488,7 @@ function submitCashPayment() {
 
 function onCashResidentChange() {
   const type = document.getElementById('cashType')?.value;
-  if (type === 'Multa' || type === 'Adeudo' || type === 'Extraordinaria') _populateCashFineSelect();
+  if (type === 'Multa' || type === 'Adeudo') _populateCashFineSelect();
 }
 
 function _populateCashFineSelect() {
@@ -466,7 +498,7 @@ function _populateCashFineSelect() {
   if (!sel) return;
   const fines = DB.payments.filter(p =>
     (p.resident_id === residentId || p.residentId === residentId) &&
-    (p.category === 'Multa' || p.category === 'Adeudo' || p.category === 'Extraordinaria') &&
+    (p.category === 'Multa' || p.category === 'Adeudo') &&
     p.status === 'pending' &&
     (!type || p.category === type)
   );
@@ -476,13 +508,16 @@ function _populateCashFineSelect() {
 
 async function saveCashPayment() {
   const residentId = document.getElementById('cashResidentId').value;
-  const month      = document.getElementById('cashMonth').value;
+  const category   = document.getElementById('cashType')?.value || 'Mantenimiento';
+  const isExtraordinaria = category === 'Extraordinaria';
+  // Una cuota extraordinaria no se vincula a un mes específico — el campo
+  // está oculto en el formulario (ver onCashTypeChange) y no se exige aquí.
+  const month      = isExtraordinaria ? '' : document.getElementById('cashMonth').value;
   const amount     = parseFloat(document.getElementById('cashAmount').value);
   const payDate    = document.getElementById('cashDate').value;
   const notes      = document.getElementById('cashNotes').value.trim();
-  const category   = document.getElementById('cashType')?.value || 'Mantenimiento';
   const linkedFineId = document.getElementById('cashLinkedFineId')?.value || '';
-  if (!residentId || !month || !amount || !payDate) {
+  if (!residentId || !amount || !payDate || (!isExtraordinaria && !month)) {
     showToast('Completa todos los campos requeridos', 'error'); return;
   }
   if ((category === 'Multa' || category === 'Adeudo') && !linkedFineId) {
@@ -496,7 +531,14 @@ async function saveCashPayment() {
   const yyyy = d.getFullYear();
   const receiptNum = `${yyyy}-${mm}-${resident.depto}`;
   const descMap = { Mantenimiento: 'Cuota mantenimiento', Multa: 'Multa', Adeudo: 'Adeudo', Extraordinaria: 'Cuota extraordinaria' };
-  const desc = `${descMap[category]||category} ${month} — Depto ${resident.depto}`;
+  // La columna payments.month no se confirmó que acepte NULL — para
+  // Extraordinaria se deriva un valor de compatibilidad a partir de la fecha
+  // de pago en vez de pedirlo en el formulario (nunca se le muestra al
+  // usuario ni se usa en el Concepto del recibo, ver buildReceiptHTML).
+  const monthValue = isExtraordinaria ? _monthLabelFromDate(payDate) : month;
+  const desc = isExtraordinaria
+    ? `${descMap[category]||category} — Depto ${resident.depto}`
+    : `${descMap[category]||category} ${monthValue} — Depto ${resident.depto}`;
   const today = new Date().toISOString().split('T')[0];
 
   const btn = document.querySelector('#modalCashPayment .btn-gold');
@@ -505,7 +547,7 @@ async function saveCashPayment() {
   try {
     const rows = await window.SUPABASE.insert('payments', {
       resident_id: residentId, resident_name: resident.name,
-      depto: resident.depto, month, amount,
+      depto: resident.depto, month: monthValue, amount,
       status: 'approved', type: 'income',
       description: desc, category,
       payment_date: payDate, approved_date: today,
@@ -526,9 +568,12 @@ async function saveCashPayment() {
 
     // Notificar al residente
     try {
+      const notifMsg = isExtraordinaria
+        ? `Tu pago de ${descMap[category]} fue registrado por administración. Ya puedes descargar tu recibo (${receiptNum}).`
+        : `Tu pago de ${monthValue} fue registrado por administración. Ya puedes descargar tu recibo (${receiptNum}).`;
       const notifRows = await window.SUPABASE.insert('notifications', {
         user_id: residentId,
-        message: `Tu pago de ${month} fue registrado por administración. Ya puedes descargar tu recibo (${receiptNum}).`,
+        message: notifMsg,
         is_read: false,
       });
       const notifRow = Array.isArray(notifRows) ? notifRows[0] : notifRows;
@@ -692,7 +737,12 @@ async function approvePayment(id) {
   // vinculado jamás se descontara.
   const category = p.category || 'Mantenimiento';
   const descMap = { Mantenimiento: 'Cuota mantenimiento', Multa: 'Multa', Adeudo: 'Adeudo', Extraordinaria: 'Cuota extraordinaria' };
-  const desc = `${descMap[category]||category} ${p.month} — Depto ${p.depto}`;
+  // Extraordinaria no se vincula a un mes — p.month aquí es solo el valor de
+  // compatibilidad derivado de la fecha de pago (ver savePayment/toDbPayment
+  // en app.js), no algo elegido por el residente; no mostrarlo en el Concepto.
+  const desc = category === 'Extraordinaria'
+    ? `${descMap[category]||category} — Depto ${p.depto}`
+    : `${descMap[category]||category} ${p.month} — Depto ${p.depto}`;
 
   try {
     await window.SUPABASE.update('payments', id, {

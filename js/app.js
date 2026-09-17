@@ -13,6 +13,14 @@ const fmtDate = d => {
     return date.toLocaleDateString('es-MX', { day:'2-digit', month:'short', year:'numeric' });
   } catch(e) { return d||'—'; }
 };
+/* 'Mes Año' derivado de una fecha 'YYYY-MM-DD' — usado como valor de
+   compatibilidad para payments.month cuando el mes ya no se le pide al
+   usuario (Cuota extraordinaria), en vez de dejar la columna vacía. */
+function monthLabelFromDate(dateStr) {
+  const m = String(dateStr).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  const d = m ? new Date(+m[1], +m[2]-1, +m[3]) : new Date(dateStr);
+  return `${_MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+}
 let chartFlow = null;
 let myFinChartInstance = null;
 let myFinDataByYear = null;
@@ -455,7 +463,19 @@ function openModalUploadPayment() {
   document.getElementById('payAmount').value    = '';
   document.getElementById('payDate').value      = new Date().toISOString().split('T')[0];
   document.getElementById('uploadFileName').textContent = 'Sin archivo seleccionado';
+  onPayTypeChange();
   openModal('modalUploadPayment');
+}
+
+/* Una cuota extraordinaria no se vincula a un mes específico — el pago
+   queda registrado solo con la fecha de pago (#payDate). */
+function onPayTypeChange() {
+  const type = document.getElementById('payType')?.value;
+  const isExtraordinaria = type === 'Extraordinaria';
+  const monthField = document.getElementById('payMonthField');
+  const grid = document.getElementById('payMonthAmountGrid');
+  monthField?.classList.toggle('hidden', isExtraordinaria);
+  if (grid) grid.style.gridTemplateColumns = isExtraordinaria ? '1fr' : '1fr 1fr';
 }
 
 function simulateUpload() { document.getElementById('payFile').click(); }
@@ -503,7 +523,11 @@ async function savePayment() {
 
   // Guardar registro de pago
   const payType = document.getElementById('payType')?.value || 'Mantenimiento';
-  const payRecord = toDbPayment({ month, amount, voucherUrl, paymentDate, category: payType }, currentUser, res.depto);
+  // La columna payments.month no se confirmó que acepte NULL — para
+  // Extraordinaria (campo oculto, ver onPayTypeChange) se deriva un valor de
+  // compatibilidad a partir de la fecha de pago en vez de pedirlo al usuario.
+  const monthValue = payType === 'Extraordinaria' ? monthLabelFromDate(paymentDate) : month;
+  const payRecord = toDbPayment({ month: monthValue, amount, voucherUrl, paymentDate, category: payType }, currentUser, res.depto);
   try {
     const rows = await window.SUPABASE.insert('payments', payRecord);
     const row = Array.isArray(rows) ? rows[0] : rows;
@@ -604,7 +628,7 @@ function buildReceiptHTML(p) {
         <div class="receipt-row"><span class="key">Residente</span><span>${resName}</span></div>
         <div class="receipt-row"><span class="key">Departamento</span><span>${p.depto||'—'}</span></div>
         <div class="receipt-row"><span class="key">Concepto</span><span>${concept}</span></div>
-        <div class="receipt-row"><span class="key">Período</span><span>${p.month||'—'}</span></div>
+        ${p.category !== 'Extraordinaria' ? `<div class="receipt-row"><span class="key">Período</span><span>${p.month||'—'}</span></div>` : ''}
         <div class="receipt-row"><span class="key">Fecha de pago</span><span>${p.paymentDate||p.payment_date ? fmtDate(p.paymentDate||p.payment_date) : fmtDate(approvedDate)}</span></div>
         <div class="receipt-row"><span class="key">Fecha aprobación</span><span>${fmtDate(approvedDate)}</span></div>
         <div class="receipt-row"><span class="key">Referencia</span><span>${recNum}</span></div>

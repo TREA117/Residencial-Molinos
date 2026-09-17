@@ -125,6 +125,11 @@ CARGOS PUNTUALES (Multas / Adeudos / Cuotas extraordinarias):
   "Cuota extraordinaria" usa el mismo mecanismo que Multa/Adeudo — pensado para
   derramas o gastos extraordinarios del condominio (ej. mantenimiento mayor,
   reparaciones no presupuestadas) que se cobran a un residente en particular.
+  A diferencia de Multa/Adeudo, una cuota extraordinaria NO se vincula a un
+  "cargo pendiente a saldar" ni pide mes de pago en el formulario (ni al
+  registrarla el admin en efectivo, ni al subir el residente su comprobante)
+  — solo se registra con la fecha de pago. Su recibo tampoco muestra la fila
+  "Período".
 
 ARCHIVOS Y LIMPIEZA AUTOMÁTICA:
   ┌────────────────────────────────────────────────────────────┐

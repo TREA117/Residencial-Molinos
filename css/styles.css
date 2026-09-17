@@ -154,6 +154,11 @@ select:focus-visible, textarea:focus-visible, .nav-item:focus-visible,
 .field input:focus-visible, .field select:focus-visible, .field textarea:focus-visible { outline: 2px solid var(--navy); outline-offset: 1px; }
 .field textarea { resize: vertical; min-height: 80px; }
 .field-hint { font-size: 11px; color: var(--mist); margin-top: 4px; }
+/* #cashFineSection ("Cargo pendiente a saldar") es un div wrapper sin la
+   clase .field — su margen inferior colapsa con el de su .field interno y
+   se veía "pegado" al siguiente campo (Mes/Monto). padding-bottom no
+   colapsa, así que agrega separación real cuando la sección está visible. */
+#cashFineSection:not(.hidden) { padding-bottom: .5rem; }
 .pass-wrap { position: relative; }
 .pass-wrap input { padding-right: 38px; width: 100%; box-sizing: border-box; }
 .pass-toggle { position: absolute; right: 10px; top: 50%; transform: translateY(-50%); background: none; border: none; cursor: pointer; padding: 2px; color: var(--mist); line-height: 0; }

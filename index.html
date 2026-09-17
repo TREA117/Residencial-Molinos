@@ -516,15 +516,15 @@
     <div class="modal-head"><span class="modal-title">Subir comprobante de pago</span><button class="modal-close" onclick="closeModal('modalUploadPayment')">✕</button></div>
     <div class="modal-body">
       <div class="field"><label for="payType">Tipo de pago</label>
-        <select id="payType">
+        <select id="payType" onchange="onPayTypeChange()">
           <option value="Mantenimiento">Mantenimiento mensual</option>
           <option value="Multa">Multa</option>
           <option value="Adeudo">Adeudo</option>
           <option value="Extraordinaria">Cuota extraordinaria</option>
         </select>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label for="payMonth">Mes de pago</label>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="payMonthAmountGrid">
+        <div class="field" id="payMonthField"><label for="payMonth">Mes de pago</label>
           <select id="payMonth"></select>
         </div>
         <div class="field"><label for="payAmount">Monto pagado (MXN)</label><input type="number" id="payAmount" placeholder="1500.00"></div>
@@ -636,8 +636,8 @@
           Registrar el año completo
         </label>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
-        <div class="field"><label for="cashMonth" id="cashMonthLabel">Mes de pago</label><select id="cashMonth"></select></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px" id="cashMonthAmountGrid">
+        <div class="field" id="cashMonthField"><label for="cashMonth" id="cashMonthLabel">Mes de pago</label><select id="cashMonth"></select></div>
         <div class="field"><label for="cashAmount" id="cashAmountLabel">Monto ($)</label><input type="number" id="cashAmount" min="1" step="0.01"></div>
       </div>
       <div class="field"><label for="cashDate">Fecha de pago</label><input type="date" id="cashDate"></div>
@@ -736,7 +736,7 @@
 <script src="js/db.js?v=20260701"></script>
 <script src="js/data.js?v=20260712"></script>
 <script src="js/auth.js?v=20260712"></script>
-<script src="js/app.js?v=20260910"></script>
-<script src="js/admin.js?v=20260912"></script>
+<script src="js/app.js?v=20260916"></script>
+<script src="js/admin.js?v=20260916"></script>
 </body>
 </html>
