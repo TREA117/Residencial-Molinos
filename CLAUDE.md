@@ -164,14 +164,7 @@ hasta vincularla vía `reconcile_user_auth_id`, ver comentarios en `doLogin()`/`
 - `admin@molino.com` / `Admin2026!` → rol admin
 - `residente.demo@molino.com` / `Residente2026!` → rol resident, depto REV1, approved
 
-⚠️ La cuenta `admin@molino.com` fue borrada por completo de Supabase (auth.users + perfil,
-vía el RPC `delete_resident_complete`) entre el 2026-07-23 y el 2026-07-31 — probablemente por
-una ejecución manual del RPC desde el SQL Editor apuntando al id equivocado, no por la UI
-(`syncResidentsFromUsers()` en `data.js` ya excluye `role='admin'` de la lista de Residentes,
-así que no se puede borrar por accidente desde el panel). Se recreó el 2026-07-31 con nuevo
-`id` de auth (perfil viejo `52502424-...` quedó anonimizado y huérfano, sin pagos/notificaciones
-asociados — se dejó así, no se limpió). Si vuelve a fallar el login de esta cuenta, verificar
-primero si sigue existiendo en `auth.users` antes de asumir que es un problema de contraseña.
+⚠️ La cuenta `admin@molino.com` fue borrada y recreada una vez en Supabase (2026-07-31, nuevo `id` de auth). Si vuelve a fallar su login, verificar primero si sigue existiendo en `auth.users` antes de asumir que es un problema de contraseña — no se puede borrar por accidente desde el panel (`syncResidentsFromUsers()` excluye `role='admin'`).
 
 **Ya no son las únicas cuentas.** Al 2026-07-23 hay ~30 residentes reales registrados en producción
 (ver `public.users`) más una cuenta admin real, todos aprobados y en uso — sus correos/contraseñas
