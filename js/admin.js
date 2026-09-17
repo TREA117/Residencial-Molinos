@@ -445,6 +445,11 @@ function onCashTypeChange() {
 
   // "Cargo pendiente a saldar" solo aplica a Multa/Adeudo — una cuota
   // extraordinaria no se vincula a un cargo previamente creado en este flujo.
+  // Reseteamos el select oculto en CUALQUIER cambio de tipo (no solo cuando
+  // se repuebla para Multa/Adeudo) para no arrastrar un cargo vinculado de
+  // un tipo de pago anterior si el admin cambia el tipo sin cerrar el modal.
+  const linkedFineSel = document.getElementById('cashLinkedFineId');
+  if (linkedFineSel) linkedFineSel.value = '';
   if (hasLinkedCharge) {
     section?.classList.remove('hidden');
     _populateCashFineSelect();
@@ -580,8 +585,11 @@ async function saveCashPayment() {
       if (notifRow && typeof normalizeNotification === 'function') DB.notifications.push(normalizeNotification(notifRow));
     } catch(ne) { console.warn('No se pudo crear la notificación', ne); }
 
-    // Si hay un cargo (multa/adeudo) vinculado, descontar el pago
-    if (linkedFineId) {
+    // Si hay un cargo (multa/adeudo) vinculado, descontar el pago.
+    // Defensa en profundidad: solo aplica para Multa/Adeudo, nunca para
+    // Extraordinaria/Mantenimiento aunque linkedFineId trajera un valor
+    // residual (no solo confiar en el reset de UI de onCashTypeChange).
+    if (linkedFineId && (category === 'Multa' || category === 'Adeudo')) {
       await _applyPaymentToFine(linkedFineId, amount);
     }
 
