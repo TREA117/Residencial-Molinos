@@ -85,7 +85,7 @@ async function goTo(page) {
 
 function updatePendingCounts() {
   const pRes = DB.residents.filter(r => r.status === 'pending').length;
-  const pPay = DB.payments.filter(p => p.status === 'pending' && p.category !== 'Multa' && p.category !== 'Adeudo' && p.category !== 'Extraordinaria').length;
+  const pPay = DB.payments.filter(p => p.status === 'pending' && (p.residentId || p.resident_id) && !isFineChargeRecord(p)).length;
   ['pendingResCount','pendingResCount2'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.textContent = pRes; el.classList.toggle('hidden', pRes === 0); }

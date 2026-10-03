@@ -111,7 +111,7 @@ function renderDashboard() {
     .filter(p => !hasFilter || String(p.approvedDate||p.approved_date||p.sentDate||p.sent_date||'').startsWith(month))
     .map(p=>{
       const isResident = !!(p.residentId||p.resident_id);
-      const descBase = p.description || (isResident ? 'Pago '+(p.month||'')+' — Depto '+(p.depto||'') : '—');
+      const descBase = p.description || (isResident ? (p.category==='Extraordinaria' ? 'Cuota extraordinaria' : 'Pago '+(p.month||''))+' — Depto '+(p.depto||'') : '—');
       const desc = p.provider ? `${p.provider} — ${descBase}` : descBase;
       const date = p.approvedDate||p.approved_date||p.sentDate||p.sent_date;
       const dispType = p.status==='pending' ? 'payment' : (p.status==='rejected' ? 'payment' : p.type);
@@ -122,7 +122,7 @@ function renderDashboard() {
   if (ra) ra.innerHTML = all.slice(0,8).map(r=>`<tr>
     <td>${fmtDate(r.date)}</td><td>${r.desc}</td>
     <td><span class="badge ${r.type==='income'?'badge-income':r.type==='expense'?'badge-expense':'badge-pending'}">${r.type==='income'?'Ingreso':r.type==='expense'?'Egreso':'Pago'}</span></td>
-    <td style="font-weight:500;color:${r.type==='income'?'var(--navy)':'var(--c-red)'}">${r.type==='income'?'+':'−'}${fmt(r.amount)}</td>
+    <td style="font-weight:500;color:${r.type==='income'?'var(--navy)':r.type==='payment'?'var(--slate)':'var(--c-red)'}">${r.type==='income'?'+':r.type==='payment'?'':'−'}${fmt(r.amount)}</td>
     <td><span class="badge ${r.status==='approved'?'badge-approved':r.status==='pending'?'badge-pending':'badge-rejected'}">${r.status==='approved'?'Aprobado':r.status==='pending'?'Pendiente':'Rechazado'}</span></td>
   </tr>`).join('');
 }
@@ -348,26 +348,31 @@ async function saveNewResident() {
 /* ── PAYMENTS / VOUCHERS (admin) ───────────────────────────── */
 function renderPayments() {
   const depto     = document.getElementById('filterPayDepto')?.value||'';
-  // Multas, adeudos y cuotas extraordinarias se gestionan en "Multas / Adeudos", no en Comprobantes
-  const residentPays = DB.payments.filter(p =>
-    (p.residentId||p.resident_id) &&
-    p.category !== 'Multa' && p.category !== 'Adeudo' && p.category !== 'Extraordinaria'
-  );
+  // Los cargos creados por el admin (multa/adeudo/cuota extraordinaria sin
+  // comprobante) se gestionan en "Multas / Adeudos". El comprobante que sube el
+  // residente para pagar uno de esos cargos trae voucher_url y sí se revisa aquí.
+  const residentPays = DB.payments.filter(p => (p.residentId||p.resident_id) && !isFineChargeRecord(p));
   const pending   = residentPays.filter(p=>p.status==='pending');
   const all       = residentPays.filter(p=>p.status!=='rejected').filter(p=>!depto||p.depto===depto);
   const ppb = document.getElementById('payPendingBadge');
   if (ppb) ppb.textContent = pending.length;
 
+  // Se reconstruye en cada render: incluye todos los residentes aprobados
+  // (aunque aún no tengan pagos) más cualquier depto que aparezca en pagos.
   const deptoSel = document.getElementById('filterPayDepto');
-  if (deptoSel && deptoSel.children.length === 1) {
-    [...new Set(residentPays.map(p=>p.depto).filter(Boolean))].sort().forEach(d=>{
-      const o=document.createElement('option'); o.value=d; o.textContent=d; deptoSel.appendChild(o);
-    });
+  if (deptoSel) {
+    const deptos = [...new Set([
+      ...DB.residents.filter(r => r.status === 'approved').map(r => r.depto),
+      ...residentPays.map(p => p.depto),
+    ].filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true }));
+    deptoSel.innerHTML = '<option value="">Todos los deptos</option>' +
+      deptos.map(d => `<option value="${escH(d)}">${escH(d)}</option>`).join('');
+    deptoSel.value = deptos.includes(depto) ? depto : '';
   }
 
   document.getElementById('tblPendingPayments').innerHTML = pending.map(p=>`<tr>
     <td style="font-weight:500">${p.residentName||p.resident_name||'—'}</td>
-    <td><strong>${p.depto||'—'}</strong></td><td>${p.month||'—'}</td>
+    <td><strong>${p.depto||'—'}</strong></td><td>${paymentPeriodLabel(p)}</td>
     <td>${fmt(p.amount)}</td>
     <td>${p.paymentDate||p.payment_date?fmtDate(p.paymentDate||p.payment_date):'—'}</td>
     <td>${fmtDate(p.sentDate||p.sent_date)}</td>
@@ -380,7 +385,7 @@ function renderPayments() {
 
   document.getElementById('tblAllPayments').innerHTML = all.map(p=>`<tr>
     <td>${p.residentName||p.resident_name||'—'}</td><td>${p.depto||'—'}</td>
-    <td>${p.month||'—'}</td><td>${fmt(p.amount)}</td>
+    <td>${paymentPeriodLabel(p)}</td><td>${fmt(p.amount)}</td>
     <td><span class="badge ${p.status==='approved'?'badge-approved':p.status==='pending'?'badge-pending':'badge-rejected'}">${p.status==='approved'?'Aprobado':p.status==='pending'?'Pendiente':'Rechazado'}</span></td>
     <td>${(p.receiptNum||p.receipt_num)?`<button class="btn btn-secondary btn-sm" onclick="showReceipt(${p.id})">${p.receiptNum||p.receipt_num}</button>`:'—'}</td>
     <td><button class="btn btn-danger btn-sm" onclick="deletePayment(${p.id})">🗑 Eliminar</button></td>
@@ -1619,15 +1624,15 @@ function renderFines() {
   const depto = document.getElementById('filterFineDepto')?.value || '';
   const fines = DB.payments.filter(p =>
     (p.residentId||p.resident_id) &&
-    (p.category==='Multa'||p.category==='Adeudo'||p.category==='Extraordinaria') &&
+    isFineChargeRecord(p) &&
     p.status==='pending' &&
     (!depto || p.depto === depto)
   );
 
   const deptoSel = document.getElementById('filterFineDepto');
   if (deptoSel && deptoSel.children.length === 1) {
-    const allFines = DB.payments.filter(p => (p.residentId||p.resident_id) && (p.category==='Multa'||p.category==='Adeudo'||p.category==='Extraordinaria') && p.status==='pending');
-    [...new Set(allFines.map(p=>p.depto).filter(Boolean))].sort().forEach(d=>{
+    const allFines = DB.payments.filter(p => (p.residentId||p.resident_id) && isFineChargeRecord(p) && p.status==='pending');
+    [...new Set(allFines.map(p=>p.depto).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })).forEach(d=>{
       const o=document.createElement('option'); o.value=d; o.textContent=d; deptoSel.appendChild(o);
     });
   }

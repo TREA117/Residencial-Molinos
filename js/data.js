@@ -33,6 +33,20 @@ function normalizePayment(p) {
     periodYear:     p.period_year ?? null,
   };
 }
+// Cargo creado por el admin (multa/adeudo/cuota extraordinaria) que el residente
+// aún debe pagar. Si trae voucher_url es el comprobante que subió el residente
+// para pagarlo, no el cargo.
+function isFineChargeRecord(p) {
+  return (p.category === 'Multa' || p.category === 'Adeudo' || p.category === 'Extraordinaria') && !p.voucherUrl && !p.voucher_url;
+}
+
+// Mantenimiento se identifica por su mes; los demás tipos por su categoría.
+function paymentPeriodLabel(p) {
+  if (p.category === 'Extraordinaria') return 'Cuota extraordinaria';
+  if (p.category === 'Multa' || p.category === 'Adeudo') return `${p.category} ${p.month || ''}`.trim();
+  return p.month || '—';
+}
+
 function normalizeNotification(n) {
   if (!n) return n;
   return { ...n,
